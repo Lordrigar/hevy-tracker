@@ -12,7 +12,9 @@
     "lint:security": "node scripts/lint-security.mjs",
     "test:unit": "corepack pnpm -r --if-present run test:unit",
     "test:integration": "corepack pnpm -r --if-present run test:integration",
-    "test": "corepack pnpm run test:unit && corepack pnpm run test:integration"
+    "test": "corepack pnpm run test:unit && corepack pnpm run test:integration",
+    "db:generate": "corepack pnpm --filter @hevy/api prisma:generate",
+    "db:migrate": "corepack pnpm --filter @hevy/api prisma:migrate"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

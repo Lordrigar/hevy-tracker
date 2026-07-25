@@ -52,8 +52,8 @@
                   "pm.test('responds with HTTP 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});",
-                  "pm.test('returns the expected service status', function () {",
-                  "  pm.expect(pm.response.json()).to.deep.equal({ status: 'ok', service: 'hevy-tracker-api' });",
+                  "pm.test('returns the expected service and database status', function () {",
+                  "  pm.expect(pm.response.json()).to.deep.equal({ status: 'ok', service: 'hevy-tracker-api', database: 'connected' });",
                   "});"
                 ]
               }
