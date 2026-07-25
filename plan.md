@@ -2,7 +2,7 @@
 
 ## Product outcome
 
-Build a local-only personal training analytics application. It imports a single Hevy Pro account, combines workout data with manually entered health data, visualizes deterministic progress metrics, and exposes those computed facts through a local MCP server for ChatGPT analysis.
+Build a local-only personal training analytics application. It manually imports a single Hevy Pro account on the dashboard owner's request, combines workout data with manually entered health data, visualizes deterministic progress metrics, and exposes those computed facts through a local MCP server for user-requested ChatGPT analysis.
 
 ## Architecture decisions
 
@@ -11,7 +11,8 @@ Build a local-only personal training analytics application. It imports a single 
 - **Frontend:** React/Vite, host-run for development, using Chakra UI.
 - **MCP:** local stdio server initially; it calls the backend REST API and never accesses secrets or the database directly. Its embedded resource links to the local dashboard until an Apps SDK component bundle is added.
 - **Data scope:** one local profile, metric units, `.env` secrets, no user authentication, no cloud deployment.
-- **AI boundary:** calculations stay deterministic. ChatGPT receives structured facts and writes the coaching explanation; the application does not call a model API in v1.
+- **Manual-trigger policy:** no schedulers, background jobs, polling, automatic syncs, or automatic model requests. Every external Hevy request and every ChatGPT/MCP analysis begins with a visible user action.
+- **AI boundary:** calculations stay deterministic. The user manually requests structured facts through ChatGPT/MCP and receives the coaching explanation; the application does not call a model API or spend tokens in v1.
 
 ## Delivery sequence
 
@@ -33,9 +34,9 @@ Tasks live in [`tasks/`](tasks/). Complete only one task at a time: implement it
 ## Core interfaces
 
 - `POST /api/health`, `GET /api/health`, `DELETE /api/health/:id` for daily health entries.
-- `POST /api/hevy/sync`, `GET /api/hevy/status` for controlled local imports.
+- `POST /api/hevy/sync`, `GET /api/hevy/status` for explicitly user-triggered local imports only.
 - `GET /api/dashboard/overview`, `GET /api/dashboard/exercise-trend`, and `GET /api/dashboard/weekly-report` for computed views.
-- MCP tools mirror read-only analytics endpoints and expose a clearly named sync action only on explicit user request.
+- MCP tools mirror read-only analytics endpoints and expose a clearly named sync action only on explicit user request. The dashboard exposes a separate manual action that prepares the current weekly facts for a ChatGPT conversation; it never calls a model itself.
 
 ## V1 reporting
 
@@ -47,7 +48,7 @@ Tasks live in [`tasks/`](tasks/). Complete only one task at a time: implement it
 ## Completion criteria
 
 - `docker compose up --build` starts PostgreSQL and the API from a clean checkout.
-- The React dashboard supports persisted health entries, Hevy sync, and readable loading/error/empty states.
-- Repeated syncs do not duplicate workouts; every sync creates an auditable status record and regenerates the weekly report after success.
-- MCP responses contain computed facts, no credentials, and can be used by a local ChatGPT developer configuration.
+- The React dashboard supports persisted health entries, visible **Sync Hevy data** and **Prepare weekly analysis** actions, plus readable loading/error/empty states.
+- Repeated user-triggered syncs do not duplicate workouts; each creates an auditable status record. A weekly report is generated or refreshed only when the user explicitly requests it.
+- MCP responses contain computed facts, no credentials, and are invoked by the user from a local ChatGPT developer configuration.
 - Every task’s manual check is recorded as passed before the next task begins.

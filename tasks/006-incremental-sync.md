@@ -4,7 +4,7 @@
 
 ## Deliverable
 
-Use Hevy workout events after the initial import, reconcile updates/deletions idempotently, and retain sync logs with status, count, and safe failure message.
+Use Hevy workout events only after the user presses **Sync Hevy data**, reconcile updates/deletions idempotently, and retain sync logs with status, count, and safe failure message. Do not schedule or poll the events endpoint.
 
 ## Automated checks
 
@@ -13,7 +13,7 @@ Use Hevy workout events after the initial import, reconcile updates/deletions id
 
 ## Manual verification
 
-Run sync twice, then modify a Hevy workout and run sync again; verify no duplicates and updated local data.
+Run the manual sync twice, then modify a Hevy workout and press **Sync Hevy data** again; verify no duplicates and updated local data.
 
 ## Done when
 

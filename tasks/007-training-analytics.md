@@ -6,6 +6,8 @@
 
 Build pure shared calculations for volume, sets, reps, RPE average, exercise high-load PRs, muscle-group distribution, and current-versus-previous period changes.
 
+Calculations execute only when an API endpoint or manual dashboard/MCP action requests them; they must not run in a background worker.
+
 ## Automated checks
 
 - Unit tests with fixed workout fixtures, null values, empty periods, and tied PRs.

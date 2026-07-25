@@ -6,6 +6,8 @@
 
 Implement validated REST CRUD for one daily metric health entry: weight, waist, chest, bicep, steps, calories, and calorie target. A repeated date must upsert the same record.
 
+Health-entry requests remain local database operations; they must not trigger Hevy syncs, weekly-report refreshes, or ChatGPT analysis.
+
 ## Automated checks
 
 - Unit tests for validation bounds and date upsert behavior.

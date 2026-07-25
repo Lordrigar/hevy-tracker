@@ -6,6 +6,8 @@
 
 Finalize Prisma models and a committed initial migration for health entries, workouts, exercises, sets, sync state/logs, and weekly reports. Add indexes for workout dates and health-entry dates.
 
+Store sync and analysis request timestamps for audit visibility, but do not add scheduling or queued-job tables.
+
 ## Automated checks
 
 - Apply migrations against the Compose PostgreSQL service.

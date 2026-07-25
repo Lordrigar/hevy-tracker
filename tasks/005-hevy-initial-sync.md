@@ -4,7 +4,7 @@
 
 ## Deliverable
 
-Create a typed Hevy client using `HEVY_API_KEY`; fetch paginated workouts, templates, and body measurements; normalize them into PostgreSQL; expose explicit sync/status endpoints.
+Create a typed Hevy client using `HEVY_API_KEY`; fetch paginated workouts, templates, and body measurements; normalize them into PostgreSQL; expose a dashboard **Sync Hevy data** button and explicit sync/status endpoints. This is the only way the application may call Hevy.
 
 ## Automated checks
 
@@ -13,7 +13,7 @@ Create a typed Hevy client using `HEVY_API_KEY`; fetch paginated workouts, templ
 
 ## Manual verification
 
-Set a real API key locally, sync once, and confirm imported workouts, exercises, sets, and status timestamp against Hevy.
+Set a real API key locally, load the dashboard without observing network traffic to Hevy, click **Sync Hevy data** once, and confirm imported workouts, exercises, sets, and status timestamp against Hevy.
 
 ## Done when
 

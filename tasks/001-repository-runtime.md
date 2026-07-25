@@ -6,6 +6,8 @@
 
 Create the pnpm workspace, NestJS API, React/Vite Chakra UI shell, Docker Compose API/PostgreSQL services, `.env.example`, and local setup documentation.
 
+The baseline must contain no scheduler, cron process, queue worker, polling loop, or automatic external network request.
+
 ## Automated checks
 
 - `corepack pnpm install`
@@ -18,6 +20,7 @@ Create the pnpm workspace, NestJS API, React/Vite Chakra UI shell, Docker Compos
 2. Run `docker compose up --build`.
 3. Run `corepack pnpm --filter @hevy/web dev`.
 4. Open `http://localhost:5173`; confirm the Chakra UI shell loads and reports API connection state.
+5. Confirm no sync or analysis request occurs merely by loading the page.
 
 ## Done when
 

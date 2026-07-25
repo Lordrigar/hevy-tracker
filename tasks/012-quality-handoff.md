@@ -14,7 +14,7 @@ Add sanitized Hevy fixtures, API integration tests, browser end-to-end smoke tes
 
 ## Manual verification
 
-From a fresh clone: configure `.env`, install dependencies, start Compose, migrate, run UI, add health data, sync or load fixtures, inspect dashboard, and use MCP tools.
+From a fresh clone: configure `.env`, install dependencies, start Compose, migrate, run UI, add health data, press **Sync Hevy data** or load fixtures, explicitly prepare a weekly analysis, inspect dashboard, and manually use MCP tools. Confirm no external request or ChatGPT interaction occurs without a deliberate user action.
 
 ## Done when
 

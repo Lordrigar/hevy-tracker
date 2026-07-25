@@ -6,6 +6,8 @@
 
 Build Chakra UI health-entry form and history table with save, delete, loading, validation, and error feedback.
 
+Saving or viewing health entries must not invoke an external API or prepare an AI analysis automatically.
+
 ## Automated checks
 
 - React component tests for form rendering, validation feedback, and API error state.
