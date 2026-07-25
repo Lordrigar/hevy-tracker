@@ -4,12 +4,15 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
-    "dev": "pnpm --parallel --filter @hevy/api --filter @hevy/web dev",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "db:generate": "pnpm --filter @hevy/api prisma:generate",
-    "db:migrate": "pnpm --filter @hevy/api prisma:migrate"
+    "dev": "corepack pnpm --parallel --filter @hevy/api --filter @hevy/web dev",
+    "build": "corepack pnpm -r --if-present run build",
+    "typecheck": "corepack pnpm -r --if-present run typecheck",
+    "lint": "corepack pnpm -r --if-present run lint",
+    "lint:architecture": "node scripts/lint-architecture.mjs",
+    "lint:security": "node scripts/lint-security.mjs",
+    "test:unit": "corepack pnpm -r --if-present run test:unit",
+    "test:integration": "corepack pnpm -r --if-present run test:integration",
+    "test": "corepack pnpm run test:unit && corepack pnpm run test:integration"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

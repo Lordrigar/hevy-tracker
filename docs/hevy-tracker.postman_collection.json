@@ -1,0 +1,71 @@
+{
+  "info": {
+    "_postman_id": "e3ca4b42-2bce-41d7-a842-cc8b249c10ab",
+    "name": "Hevy Tracker — Local API",
+    "description": "Import this collection into Postman to exercise the local Hevy Tracker API. Keep it in sync with every public REST endpoint. Secrets are variables only; never commit populated values.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string",
+      "description": "Local NestJS API base URL. Override for a non-default local port."
+    },
+    {
+      "key": "hevyApiKey",
+      "value": "",
+      "type": "string",
+      "description": "Reserved for manual Hevy API troubleshooting only. The local API reads HEVY_API_KEY from .env; do not send this value to local endpoints or commit a real key."
+    },
+    {
+      "key": "apiToken",
+      "value": "",
+      "type": "string",
+      "description": "Reserved for a future local API authentication scheme. The v1 local API has no user authentication."
+    }
+  ],
+  "item": [
+    {
+      "name": "Foundation",
+      "item": [
+        {
+          "name": "API health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Confirms the local NestJS API is running. This endpoint never triggers a Hevy sync or ChatGPT analysis."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds with HTTP 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('returns the expected service status', function () {",
+                  "  pm.expect(pm.response.json()).to.deep.equal({ status: 'ok', service: 'hevy-tracker-api' });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Future endpoints",
+      "description": "Add requests here only in the task that introduces their API endpoint. Each request must include a no-secret example body, expected status tests, and manual-trigger behaviour where relevant.",
+      "item": []
+    }
+  ]
+}

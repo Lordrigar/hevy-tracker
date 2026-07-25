@@ -16,6 +16,7 @@
 5. Every handoff must include a concise manual test script: prerequisite setup, exact REST endpoints and example request data to query, plus the dashboard route/view and expected result to inspect.
 6. The project manager performs manual verification. Record its result in the task file before beginning the next task.
 7. Keep application changes unstaged until their corresponding task has passed manual verification.
+8. When a task adds or changes a REST endpoint, update `docs/hevy-tracker.postman_collection.json` in the same task with safe sample data and Postman tests. Validate the collection JSON before handoff.
 
 ## Mandatory local quality gate
 
@@ -30,8 +31,9 @@ pnpm lint:security
 pnpm test:unit
 pnpm test:integration
 pnpm test
-pnpm --filter @hevy/api prisma:migrate
 ```
+
+Run database migration checks only for a task that introduces or changes Prisma schema/migrations.
 
 ## Handoff format
 
