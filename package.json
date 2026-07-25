@@ -1,0 +1,17 @@
+{
+  "name": "hevy-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @hevy/api --filter @hevy/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @hevy/api prisma:generate",
+    "db:migrate": "pnpm --filter @hevy/api prisma:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

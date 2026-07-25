@@ -1,2 +1,61 @@
-# hevy-tracker
-Hevy integration showcasing usage of AI agents to plan and execute projects
+# Hevy Tracker
+
+Hevy Tracker is a local-first personal training analytics project. It will import workout data from the [Hevy](https://www.hevyapp.com/) API, combine it with manually tracked health data, and make clear training trends available in a React dashboard and a local MCP server for ChatGPT analysis.
+
+The project is deliberately designed as an AI-engineering showcase as well as a useful personal tool: it uses a structured delivery plan, small manually verifiable tasks, reusable Codex skills, and documented data workflows. No data is deployed to a third-party application server.
+
+## Planned capabilities
+
+- Import and incrementally synchronize one Hevy Pro account.
+- Track local daily weight, body measurements, steps, calorie intake, and calorie targets.
+- Analyse volume, sets, reps, PRs, exercise progression, intensity proxy, and muscle-group distribution.
+- Produce a computed weekly comparison report after sync.
+- Browse charts in a Chakra UI React dashboard.
+- Ask ChatGPT about the computed data through a local MCP server without exposing credentials.
+
+TDEE, body-fat estimates, calorie-adherence scoring, and timeline forecasts are intentionally deferred until the core tracker is verified.
+
+## Architecture
+
+| Area | Choice |
+| --- | --- |
+| Monorepo | pnpm workspaces |
+| API | NestJS REST API |
+| Database | PostgreSQL with Prisma |
+| Local services | Docker Compose runs PostgreSQL and the API |
+| Dashboard | React, Vite, Chakra UI |
+| Chat integration | Local MCP server backed by computed API data |
+
+The frontend will run on the host during development. Secrets belong only in `.env`; neither the REST API nor MCP tools may return them.
+
+## Development workflow
+
+Do not build the entire project in one change. Work through the granular task sequence in [plan.md](plan.md), complete the automated and manual checks in the active task, record its result, and only then begin the next task.
+
+The task sequence begins at [tasks/001-repository-runtime.md](tasks/001-repository-runtime.md). The plan defines all expected interfaces, data boundaries, and release completion criteria.
+
+## Local setup (after Task 1 is complete)
+
+1. Install Node.js 22+ and enable Corepack: `corepack enable`.
+2. Copy `.env.example` to `.env` and set a strong local PostgreSQL password. Add `HEVY_API_KEY` only when beginning the Hevy sync task.
+3. Install workspace dependencies: `corepack pnpm install`.
+4. Start the local services: `docker compose up --build`.
+5. Start the dashboard in another terminal: `corepack pnpm --filter @hevy/web dev`.
+6. Open `http://localhost:5173`.
+
+Once the workspace exists, the standard quality commands will be:
+
+```sh
+pnpm test
+pnpm build
+pnpm --filter @hevy/api prisma:migrate
+pnpm --filter @hevy/mcp dev
+```
+
+## Manual verification
+
+Each task has a dedicated manual checkpoint. The overall final demonstration will prove that a fresh local checkout can start PostgreSQL and the API, persist health data, synchronize Hevy data without duplication, render charts, generate a weekly report, and serve deterministic facts to a local MCP client.
+
+## Repository status
+
+This repository is currently in the scaffold-and-plan stage. Application code is intentionally not staged until the corresponding task is explicitly completed and manually verified.
