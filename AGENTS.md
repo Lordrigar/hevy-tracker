@@ -3,6 +3,7 @@
 - Use pnpm from the repository root. Do not commit `.env`, PostgreSQL volumes, or generated credentials.
 - API changes must keep secrets out of REST and MCP responses. MCP tools return computed facts only.
 - Run `pnpm test` before handoff. Use the `test-runner` skill for focused validation and `debug-logs` for sync/API failures.
+- Use `pnpm format` after changing source files; do not hand-format around Prettier. ESLint and `pnpm format:check` are mandatory through the quality gate.
 - The intended local flow is Docker Compose for PostgreSQL/API and `pnpm --filter @hevy/web dev` for the UI.
 - Preserve metric units internally (kg, cm) and make analytics deterministic; ChatGPT explains rather than fabricates calculations.
 - Never add a scheduler, polling loop, cron job, queue worker, automatic Hevy request, or automatic ChatGPT/model request. The user must explicitly trigger **Sync Hevy data** and **Prepare weekly analysis** from the dashboard or manually invoke an MCP tool.

@@ -17,13 +17,13 @@ TDEE, body-fat estimates, calorie-adherence scoring, and timeline forecasts are 
 
 ## Architecture
 
-| Area | Choice |
-| --- | --- |
-| Monorepo | pnpm workspaces |
-| API | NestJS REST API |
-| Database | PostgreSQL with Prisma |
-| Local services | Docker Compose runs PostgreSQL and the API |
-| Dashboard | React, Vite, Chakra UI |
+| Area             | Choice                                       |
+| ---------------- | -------------------------------------------- |
+| Monorepo         | pnpm workspaces                              |
+| API              | NestJS REST API                              |
+| Database         | PostgreSQL with Prisma                       |
+| Local services   | Docker Compose runs PostgreSQL and the API   |
+| Dashboard        | React, Vite, Chakra UI                       |
 | Chat integration | Local MCP server backed by computed API data |
 
 The frontend will run on the host during development. Secrets belong only in `.env`; neither the REST API nor MCP tools may return them.
