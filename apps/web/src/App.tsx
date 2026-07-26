@@ -5,7 +5,7 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 export function App() {
   const [state, setState] = useState<'checking' | 'connected' | 'unavailable'>('checking');
   useEffect(() => {
-    fetch(`${apiUrl}/health`)
+    fetch(`${apiUrl}/health/status`)
       .then((response) => setState(response.ok ? 'connected' : 'unavailable'))
       .catch(() => setState('unavailable'));
   }, []);

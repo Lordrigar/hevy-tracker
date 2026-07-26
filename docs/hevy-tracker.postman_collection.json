@@ -23,6 +23,12 @@
       "value": "",
       "type": "string",
       "description": "Reserved for a future local API authentication scheme. The v1 local API has no user authentication."
+    },
+    {
+      "key": "healthEntryId",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically after the create/upsert request and used by the update and delete requests."
     }
   ],
   "item": [
@@ -36,9 +42,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health",
+              "raw": "{{baseUrl}}/health/status",
               "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "path": ["health", "status"]
             },
             "description": "Confirms the local NestJS API is running. This endpoint never triggers a Hevy sync or ChatGPT analysis."
           },
@@ -55,6 +61,140 @@
                   "pm.test('returns the expected service and database status', function () {",
                   "  pm.expect(pm.response.json()).to.deep.equal({ status: 'ok', service: 'hevy-tracker-api', database: 'connected' });",
                   "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health entries",
+      "description": "Local database CRUD only. These requests never trigger a Hevy sync, weekly report, or ChatGPT analysis.",
+      "item": [
+        {
+          "name": "Create or upsert daily entry",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-07-26\",\n  \"weightKg\": 80.2,\n  \"waistCm\": 82,\n  \"chestCm\": 102,\n  \"bicepCm\": 38,\n  \"steps\": 8000,\n  \"calories\": 2500,\n  \"calorieTarget\": 2600\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Creates an entry for the specified UTC date or updates the existing entry for that date."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creates or updates successfully', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "pm.test('returns the daily entry id', function () { pm.collectionVariables.set('healthEntryId', pm.response.json().id); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List daily entries",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update entry by id",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-07-26\",\n  \"weightKg\": 79.8,\n  \"steps\": 9000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/health/{{healthEntryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "{{healthEntryId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('updates successfully', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete entry by id",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/{{healthEntryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "{{healthEntryId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deletes successfully', function () { pm.response.to.have.status(200); });",
+                  "pm.test('returns a compact success result', function () { pm.expect(pm.response.json()).to.deep.equal({ success: true }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid entry",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"invalid\",\n  \"weightKg\": 10,\n  \"steps\": -1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns validation error', function () { pm.response.to.have.status(400); });"
                 ]
               }
             }
