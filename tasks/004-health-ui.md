@@ -1,6 +1,6 @@
 # 004 — Health-entry Chakra UI
 
-**Status:** not started.
+**Status:** completed on 2026-07-26.
 
 ## Deliverable
 
@@ -16,6 +16,9 @@ Saving or viewing health entries must not invoke an external API or prepare an A
 ## Manual verification
 
 Add a health entry, refresh the browser, edit the same date, delete it, and confirm UI results match the API.
+
+**Result (2026-07-26):** Passed. The project manager verified the modal-based create and edit flow,
+local persistence after refresh, deletion, and validation feedback.
 
 ## Done when
 

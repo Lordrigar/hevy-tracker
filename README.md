@@ -32,10 +32,12 @@ The frontend will run on the host during development. Secrets belong only in `.e
 
 1. Install Node.js 22+ and enable Corepack: `corepack enable`.
 2. Copy `.env.example` to `.env` and set a strong local PostgreSQL password. Add `HEVY_API_KEY` only when beginning the Hevy sync task.
-3. Install workspace dependencies: `corepack pnpm install`.
-4. Start the local services: `docker compose up --build`.
-5. Start the dashboard in another terminal: `corepack pnpm --filter @hevy/web dev`.
-6. Open `http://localhost:5173`.
+3. Copy `apps/web/.env.example` to `apps/web/.env`. It defines `VITE_API_URL`, the dashboard's local API base URL.
+4. If you run the NestJS API directly rather than through Docker, copy `apps/api/.env.example` to `apps/api/.env` and use the matching PostgreSQL password.
+5. Install workspace dependencies: `corepack pnpm install`.
+6. Start the local services: `docker compose up --build`.
+7. Start the dashboard in another terminal: `corepack pnpm --filter @hevy/web dev`.
+8. Open `http://localhost:5173`.
 
 Useful contributor commands:
 

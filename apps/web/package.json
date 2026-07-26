@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "vitest run --passWithNoTests",
-    "test:unit": "vitest run --passWithNoTests",
+    "test": "vitest run --passWithNoTests --config vitest.config.ts",
+    "test:unit": "vitest run --passWithNoTests --config vitest.config.ts",
     "test:integration": "vitest run --passWithNoTests",
     "lint": "tsc -b --noEmit",
     "typecheck": "tsc -b --noEmit"
@@ -15,14 +15,19 @@
   "dependencies": {
     "@chakra-ui/react": "^3.21.0",
     "@emotion/react": "^11.14.0",
+    "@tanstack/react-query": "^5.101.4",
     "framer-motion": "^12.23.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^26.1.0",
     "typescript": "^5.8.3",
     "vite": "^7.0.0",
     "vitest": "^3.2.4"
