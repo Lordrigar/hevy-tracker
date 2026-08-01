@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import bodyMeasurementsPage from './fixtures/hevy-body-measurements-page.json';
 import templatesPage from './fixtures/hevy-templates-page.json';
+import workoutEventsPage from './fixtures/hevy-workout-events-page.json';
 import workoutsPage from './fixtures/hevy-workouts-page.json';
 import {
   HevyApiError,
@@ -50,6 +51,37 @@ describe('HevyClient', () => {
     const client = new HevyClient();
 
     await expect(client.listWorkouts()).rejects.toThrow('Hevy rejected the configured API key');
+    vi.unstubAllGlobals();
+    delete process.env.HEVY_API_KEY;
+  });
+
+  it('requests workout events only through a GET request with a since cursor', async () => {
+    process.env.HEVY_API_KEY = 'sanitized-test-key';
+    const fetchMock = vi.fn().mockResolvedValue(response(workoutEventsPage));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new HevyClient();
+    await expect(
+      client.listWorkoutEvents(new Date('2026-07-20T00:00:00.000Z')),
+    ).resolves.toHaveLength(2);
+
+    expect(fetchMock.mock.calls[0][0].toString()).toContain('since=2026-07-20T00%3A00%3A00.000Z');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+    vi.unstubAllGlobals();
+    delete process.env.HEVY_API_KEY;
+  });
+
+  it('accepts the live workout-events collection key returned by Hevy', async () => {
+    process.env.HEVY_API_KEY = 'sanitized-test-key';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(response({ page: 1, page_count: 1, workouts: [] })),
+    );
+
+    await expect(
+      new HevyClient().listWorkoutEvents(new Date('2026-08-01T00:00:00.000Z')),
+    ).resolves.toEqual([]);
+
     vi.unstubAllGlobals();
     delete process.env.HEVY_API_KEY;
   });
@@ -104,5 +136,38 @@ describe('HevySyncService mapping', () => {
       waistCm: 82,
       bicepCm: 38,
     });
+  });
+});
+
+describe('HevySyncService incremental reconciliation', () => {
+  it('reconciles update and delete events idempotently', async () => {
+    const upsert = vi.fn();
+    const deleteMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    const transaction = vi.fn(async (callback) => callback({ workout: { upsert, deleteMany } }));
+    const service = new HevySyncService(
+      {
+        hevyExerciseTemplate: { findMany: vi.fn().mockResolvedValue([]) },
+        $transaction: transaction,
+      } as never,
+      { listWorkoutEvents: vi.fn().mockResolvedValue(workoutEventsPage.events) } as never,
+    ) as unknown as {
+      syncIncremental: (since: Date) => Promise<{ updated: number; deleted: number }>;
+    };
+    const since = new Date('2026-07-20T00:00:00.000Z');
+
+    await expect(service.syncIncremental(since)).resolves.toEqual({
+      imported: 0,
+      updated: 1,
+      deleted: 1,
+      message: 'Applied 1 workout updates and 1 deletions since 2026-07-20T00:00:00.000Z.',
+    });
+    await expect(service.syncIncremental(since)).resolves.toMatchObject({ updated: 1, deleted: 0 });
+
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(deleteMany).toHaveBeenCalledTimes(2);
+    expect(deleteMany).toHaveBeenLastCalledWith({ where: { id: 'workout_fixture_deleted' } });
   });
 });

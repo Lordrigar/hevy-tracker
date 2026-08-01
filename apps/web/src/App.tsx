@@ -202,6 +202,14 @@ export function App() {
                       {hevyStatusQuery.data.message}
                     </Text>
                   )}
+                  {hevyStatusQuery.data?.latestAudit && (
+                    <Text color="fg.muted" fontSize="sm">
+                      Latest audit ({hevyStatusQuery.data.latestAudit.mode}):{' '}
+                      {hevyStatusQuery.data.latestAudit.imported} imported,{' '}
+                      {hevyStatusQuery.data.latestAudit.updated} updated,{' '}
+                      {hevyStatusQuery.data.latestAudit.deleted} deleted.
+                    </Text>
+                  )}
                 </>
               )}
               {syncHevy.isError && (

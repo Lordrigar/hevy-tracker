@@ -51,6 +51,9 @@ export type HevyBodyMeasurement = {
   biceps?: number | null;
 };
 
+export type HevyWorkoutEvent =
+  { type: 'updated'; workout: HevyWorkout } | { type: 'deleted'; id: string; deleted_at?: string };
+
 type PaginatedResponse<T, K extends string> = {
   page: number;
   page_count: number;
@@ -85,7 +88,23 @@ export class HevyClient {
     );
   }
 
-  private async listAll<T, K extends string>(path: string, collectionKey: K): Promise<T[]> {
+  async listWorkoutEvents(since: Date) {
+    return this.listAll<HevyWorkoutEvent, 'events'>(
+      '/workouts/events',
+      'events',
+      {
+        since: since.toISOString(),
+      },
+      ['workouts'],
+    );
+  }
+
+  private async listAll<T, K extends string>(
+    path: string,
+    collectionKey: K,
+    query: Record<string, string> = {},
+    collectionAliases: string[] = [],
+  ): Promise<T[]> {
     const apiKey = process.env.HEVY_API_KEY;
     if (!apiKey) {
       throw new HevyApiError('HEVY_API_KEY is not configured. Add it to your local environment.');
@@ -99,6 +118,7 @@ export class HevyClient {
       const url = new URL(`${this.baseUrl}${path}`);
       url.searchParams.set('page', String(page));
       url.searchParams.set('pageSize', String(PAGE_SIZE));
+      for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
       const response: Response = await fetch(url, {
         method: 'GET',
         headers: { 'api-key': apiKey },
@@ -108,11 +128,11 @@ export class HevyClient {
       if (!response.ok) {
         throw new HevyApiError(this.messageFor(response.status));
       }
-      if (!this.isPaginatedResponse<T, K>(body, collectionKey)) {
+      if (!this.isPaginatedResponse<T, K>(body, collectionKey, collectionAliases)) {
         throw new HevyApiError('Hevy returned an unexpected response. Please try again later.');
       }
 
-      all.push(...body[collectionKey]);
+      all.push(...this.collectionFrom(body, collectionKey, collectionAliases));
       pageCount = body.page_count;
       page += 1;
     }
@@ -123,6 +143,7 @@ export class HevyClient {
   private isPaginatedResponse<T, K extends string>(
     body: unknown,
     collectionKey: K,
+    collectionAliases: string[],
   ): body is PaginatedResponse<T, K> {
     if (!body || typeof body !== 'object') return false;
     const value = body as Record<string, unknown>;
@@ -132,7 +153,19 @@ export class HevyClient {
       typeof value.page_count === 'number' &&
       Number.isInteger(value.page_count) &&
       value.page_count >= value.page &&
-      Array.isArray(value[collectionKey])
+      (Array.isArray(value[collectionKey]) ||
+        collectionAliases.some((key) => Array.isArray(value[key])))
+    );
+  }
+
+  private collectionFrom<T, K extends string>(
+    body: PaginatedResponse<T, K>,
+    collectionKey: K,
+    collectionAliases: string[],
+  ) {
+    const value = body as Record<string, T[]>;
+    return (
+      value[collectionKey] || collectionAliases.map((key) => value[key]).find(Array.isArray) || []
     );
   }
 
@@ -153,60 +186,58 @@ export class HevySyncService {
   ) {}
 
   async status() {
-    return (
-      (await this.prisma.syncState.findUnique({ where: { id: 'hevy' } })) ?? {
-        id: 'hevy',
-        lastSyncedAt: null,
-        status: 'never',
-        message: null,
-      }
-    );
+    const state = (await this.prisma.syncState.findUnique({ where: { id: 'hevy' } })) ?? {
+      id: 'hevy',
+      lastSyncedAt: null,
+      lastEventAt: null,
+      status: 'never',
+      message: null,
+    };
+    const latestAudit = await this.prisma.syncLog.findFirst({ orderBy: { startedAt: 'desc' } });
+    return { ...state, latestAudit };
   }
 
   async sync() {
+    const startedAt = new Date();
+    const previousState = await this.prisma.syncState.findUnique({ where: { id: 'hevy' } });
+    const isIncremental = Boolean(previousState?.lastSyncedAt);
+    const audit = await this.prisma.syncLog.create({
+      data: { status: 'running', mode: isIncremental ? 'incremental' : 'initial' },
+    });
+
     try {
-      const [workouts, templates, measurements] = await Promise.all([
-        this.hevyClient.listWorkouts(),
-        this.hevyClient.listExerciseTemplates(),
-        this.hevyClient.listBodyMeasurements(),
-      ]);
-      const templateById = new Map(templates.map((template) => [template.id, template]));
-
-      await this.prisma.$transaction(async (tx) => {
-        for (const template of templates) {
-          await tx.hevyExerciseTemplate.upsert({
-            where: { id: template.id },
-            create: this.templateData(template),
-            update: this.templateData(template),
-          });
-        }
-        for (const measurement of measurements) {
-          const date = this.localDate(measurement.date);
-          await tx.hevyBodyMeasurement.upsert({
-            where: { date },
-            create: { date, ...this.measurementData(measurement) },
-            update: this.measurementData(measurement),
-          });
-        }
-        for (const workout of workouts) {
-          const data = this.workoutData(workout, templateById);
-          await tx.workout.upsert({
-            where: { id: workout.id },
-            create: data,
-            update: { ...data, exercises: { deleteMany: {}, create: data.exercises.create } },
-          });
-        }
-      });
-
+      const result = isIncremental
+        ? await this.syncIncremental(previousState?.lastEventAt || previousState!.lastSyncedAt!)
+        : await this.syncInitial();
       const completedAt = new Date();
-      const imported = workouts.length + templates.length + measurements.length;
-      const message = `Imported ${workouts.length} workouts, ${templates.length} templates, and ${measurements.length} body measurements.`;
+      const message = result.message;
       await this.prisma.syncState.upsert({
         where: { id: 'hevy' },
-        create: { id: 'hevy', lastSyncedAt: completedAt, status: 'succeeded', message },
-        update: { lastSyncedAt: completedAt, status: 'succeeded', message },
+        create: {
+          id: 'hevy',
+          lastSyncedAt: completedAt,
+          lastEventAt: startedAt,
+          status: 'succeeded',
+          message,
+        },
+        update: {
+          lastSyncedAt: completedAt,
+          lastEventAt: startedAt,
+          status: 'succeeded',
+          message,
+        },
       });
-      return { status: 'succeeded', imported, message, syncedAt: completedAt };
+      await this.prisma.syncLog.update({
+        where: { id: audit.id },
+        data: { status: 'succeeded', finishedAt: completedAt, ...result },
+      });
+      return {
+        status: 'succeeded' as const,
+        mode: isIncremental ? 'incremental' : 'initial',
+        ...result,
+        message,
+        syncedAt: completedAt,
+      };
     } catch (error) {
       const message =
         error instanceof HevyApiError ? error.message : 'Local Hevy import failed. Try again.';
@@ -215,10 +246,95 @@ export class HevySyncService {
         create: { id: 'hevy', status: 'failed', message },
         update: { status: 'failed', message },
       });
+      await this.prisma.syncLog.update({
+        where: { id: audit.id },
+        data: { status: 'failed', finishedAt: new Date(), message },
+      });
 
       if (error instanceof HevyApiError) throw new ServiceUnavailableException(message);
       throw new BadGatewayException(message);
     }
+  }
+
+  private async syncInitial() {
+    const [workouts, templates, measurements] = await Promise.all([
+      this.hevyClient.listWorkouts(),
+      this.hevyClient.listExerciseTemplates(),
+      this.hevyClient.listBodyMeasurements(),
+    ]);
+    const templateById = new Map(templates.map((template) => [template.id, template]));
+    await this.prisma.$transaction(async (tx) => {
+      for (const template of templates) {
+        await tx.hevyExerciseTemplate.upsert({
+          where: { id: template.id },
+          create: this.templateData(template),
+          update: this.templateData(template),
+        });
+      }
+      for (const measurement of measurements) {
+        const date = this.localDate(measurement.date);
+        await tx.hevyBodyMeasurement.upsert({
+          where: { date },
+          create: { date, ...this.measurementData(measurement) },
+          update: this.measurementData(measurement),
+        });
+      }
+      for (const workout of workouts) await this.upsertWorkout(tx, workout, templateById);
+    });
+    const imported = workouts.length + templates.length + measurements.length;
+    return {
+      imported,
+      updated: 0,
+      deleted: 0,
+      message: `Imported ${workouts.length} workouts, ${templates.length} templates, and ${measurements.length} body measurements.`,
+    };
+  }
+
+  private async syncIncremental(since: Date) {
+    const events = await this.hevyClient.listWorkoutEvents(since);
+    const templateById = new Map(
+      (await this.prisma.hevyExerciseTemplate.findMany()).map((template) => [
+        template.id,
+        {
+          id: template.id,
+          title: template.title,
+          type: template.type,
+          primary_muscle_group: template.primaryMuscleGroup,
+        } as HevyExerciseTemplate,
+      ]),
+    );
+    let updated = 0;
+    let deleted = 0;
+    await this.prisma.$transaction(async (tx) => {
+      for (const event of [...events].reverse()) {
+        if (event.type === 'updated') {
+          await this.upsertWorkout(tx, event.workout, templateById);
+          updated += 1;
+        } else if (event.type === 'deleted') {
+          const result = await tx.workout.deleteMany({ where: { id: event.id } });
+          deleted += result.count;
+        }
+      }
+    });
+    return {
+      imported: 0,
+      updated,
+      deleted,
+      message: `Applied ${updated} workout updates and ${deleted} deletions since ${since.toISOString()}.`,
+    };
+  }
+
+  private async upsertWorkout(
+    tx: Prisma.TransactionClient,
+    workout: HevyWorkout,
+    templateById: Map<string, HevyExerciseTemplate>,
+  ) {
+    const data = this.workoutData(workout, templateById);
+    await tx.workout.upsert({
+      where: { id: workout.id },
+      create: data,
+      update: { ...data, exercises: { deleteMany: {}, create: data.exercises.create } },
+    });
   }
 
   private workoutData(workout: HevyWorkout, templateById: Map<string, HevyExerciseTemplate>) {

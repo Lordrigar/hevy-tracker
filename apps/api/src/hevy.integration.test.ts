@@ -7,17 +7,20 @@ const databaseUrl =
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 const fixtureTemplateId = 'task-005-fixture-template';
 const fixtureMeasurementDate = new Date('2026-08-01T00:00:00.000Z');
+const fixtureSyncLogMessage = 'Task 6 fixture audit';
 
 describe('Task 5 Hevy import persistence', () => {
   beforeAll(async () => {
     await prisma.$connect();
     await prisma.hevyExerciseTemplate.deleteMany({ where: { id: fixtureTemplateId } });
     await prisma.hevyBodyMeasurement.deleteMany({ where: { date: fixtureMeasurementDate } });
+    await prisma.syncLog.deleteMany({ where: { message: fixtureSyncLogMessage } });
   });
 
   afterAll(async () => {
     await prisma.hevyExerciseTemplate.deleteMany({ where: { id: fixtureTemplateId } });
     await prisma.hevyBodyMeasurement.deleteMany({ where: { date: fixtureMeasurementDate } });
+    await prisma.syncLog.deleteMany({ where: { message: fixtureSyncLogMessage } });
     await prisma.$disconnect();
   });
 
@@ -49,5 +52,38 @@ describe('Task 5 Hevy import persistence', () => {
     await expect(
       prisma.healthEntry.findMany({ where: { date: fixtureMeasurementDate } }),
     ).resolves.toHaveLength(0);
+  });
+});
+
+describe('Task 6 sync audit persistence', () => {
+  beforeAll(async () => {
+    await prisma.$connect();
+    await prisma.syncLog.deleteMany({ where: { message: fixtureSyncLogMessage } });
+  });
+
+  afterAll(async () => {
+    await prisma.syncLog.deleteMany({ where: { message: fixtureSyncLogMessage } });
+    await prisma.$disconnect();
+  });
+
+  it('records successful incremental reconciliation counts', async () => {
+    const audit = await prisma.syncLog.create({
+      data: {
+        status: 'succeeded',
+        mode: 'incremental',
+        imported: 0,
+        updated: 1,
+        deleted: 1,
+        finishedAt: new Date(),
+        message: fixtureSyncLogMessage,
+      },
+    });
+
+    expect(audit).toMatchObject({
+      status: 'succeeded',
+      mode: 'incremental',
+      updated: 1,
+      deleted: 1,
+    });
   });
 });

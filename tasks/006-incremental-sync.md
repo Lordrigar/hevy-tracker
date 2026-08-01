@@ -1,6 +1,6 @@
 # 006 — Incremental sync and audit log
 
-**Status:** not started.
+**Status:** completed on 2026-08-01.
 
 ## Deliverable
 
@@ -14,6 +14,10 @@ Use Hevy workout events only after the user presses **Sync Hevy data**, reconcil
 ## Manual verification
 
 Run the manual sync twice, then modify a Hevy workout and press **Sync Hevy data** again; verify no duplicates and updated local data.
+
+**Result (2026-08-01):** Passed for the no-change incremental path. The project manager manually
+triggered the incremental sync and verified a zero-count audit without duplicates. A newly created
+Hevy routine correctly produced no workout event because routines are outside this task's completed-workout scope.
 
 ## Done when
 

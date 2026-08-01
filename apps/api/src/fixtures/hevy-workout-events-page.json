@@ -1,0 +1,21 @@
+{
+  "page": 1,
+  "page_count": 1,
+  "events": [
+    {
+      "type": "updated",
+      "workout": {
+        "id": "workout_fixture_1",
+        "title": "Fixture upper body updated",
+        "start_time": "2026-07-20T18:00:00.000Z",
+        "end_time": "2026-07-20T19:05:00.000Z",
+        "exercises": []
+      }
+    },
+    {
+      "type": "deleted",
+      "id": "workout_fixture_deleted",
+      "deleted_at": "2026-07-21T09:00:00.000Z"
+    }
+  ]
+}

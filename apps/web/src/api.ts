@@ -28,11 +28,24 @@ export type HevySyncStatus = {
   lastSyncedAt: string | null;
   status: 'never' | 'succeeded' | 'failed';
   message: string | null;
+  latestAudit: {
+    startedAt: string;
+    finishedAt: string | null;
+    status: string;
+    mode: string;
+    imported: number;
+    updated: number;
+    deleted: number;
+    message: string | null;
+  } | null;
 };
 
 export type HevySyncResult = {
   status: 'succeeded';
+  mode: 'initial' | 'incremental';
   imported: number;
+  updated: number;
+  deleted: number;
   message: string;
   syncedAt: string;
 };

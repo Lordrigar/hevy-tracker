@@ -217,7 +217,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["hevy", "status"]
             },
-            "description": "Reads the local sync state only; it never contacts Hevy."
+            "description": "Reads the local sync state and latest audit record only; it never contacts Hevy."
           },
           "response": [],
           "event": [
@@ -227,6 +227,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('returns local sync status', function () { pm.response.to.have.status(200); });",
+                  "pm.test('includes a safe latest audit field', function () { pm.expect(pm.response.json()).to.have.property('latestAudit'); });",
                   "pm.test('does not return a secret', function () { pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
                 ]
               }
