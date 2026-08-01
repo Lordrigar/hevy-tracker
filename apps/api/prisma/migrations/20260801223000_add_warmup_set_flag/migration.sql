@@ -1,0 +1,1 @@
+ALTER TABLE "WorkoutSet" ADD COLUMN "isWarmup" BOOLEAN NOT NULL DEFAULT false;

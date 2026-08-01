@@ -30,6 +30,16 @@ export type WorkoutHistoryItem = {
   volumeKg: number;
 };
 
+export type BodyMeasurementHistoryItem = {
+  date: Date;
+  weightKg: number | null;
+  bodyFatPercentage: number | null;
+  chestCm: number | null;
+  waistCm: number | null;
+  hipsCm: number | null;
+  bicepCm: number | null;
+};
+
 @Injectable()
 export class DashboardAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -88,6 +98,23 @@ export class DashboardAnalyticsService {
       .reverse();
   }
 
+  async measurementHistory(query: AnalyticsPeriodQuery): Promise<BodyMeasurementHistoryItem[]> {
+    const period = this.periodFrom(query);
+    return this.prisma.hevyBodyMeasurement.findMany({
+      where: { date: { gte: period.currentStart, lt: period.currentEndExclusive } },
+      orderBy: { date: 'asc' },
+      select: {
+        date: true,
+        weightKg: true,
+        bodyFatPercentage: true,
+        chestCm: true,
+        waistCm: true,
+        hipsCm: true,
+        bicepCm: true,
+      },
+    });
+  }
+
   private async workoutsIn(start: Date, endExclusive: Date): Promise<AnalyticsWorkout[]> {
     const [workouts, templates, measurements] = await Promise.all([
       this.prisma.workout.findMany({
@@ -112,6 +139,9 @@ export class DashboardAnalyticsService {
         name: exercise.name,
         templateId: exercise.templateId,
         muscleGroup: exercise.muscleGroup,
+        secondaryMuscleGroups: secondaryMuscleGroups(
+          templatesById.get(exercise.templateId || '')?.secondaryMuscleGroups,
+        ),
         isBodyweight: ['reps_only', 'bodyweight_weighted'].includes(
           templatesById.get(exercise.templateId || '')?.type || '',
         ),
@@ -119,6 +149,7 @@ export class DashboardAnalyticsService {
           weightKg: set.weightKg,
           reps: set.reps,
           rpe: set.rpe,
+          isWarmup: set.isWarmup,
         })),
       })),
     }));
@@ -151,6 +182,12 @@ function latestWeightAt(
   return null;
 }
 
+function secondaryMuscleGroups(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
 @Controller('dashboard')
 export class DashboardAnalyticsController {
   constructor(private readonly analytics: DashboardAnalyticsService) {}
@@ -168,6 +205,11 @@ export class DashboardAnalyticsController {
   @Get('workout-history')
   workoutHistory(@Query() query: AnalyticsPeriodQuery) {
     return this.analytics.workoutHistory(query);
+  }
+
+  @Get('measurements')
+  measurementHistory(@Query() query: AnalyticsPeriodQuery) {
+    return this.analytics.measurementHistory(query);
   }
 }
 

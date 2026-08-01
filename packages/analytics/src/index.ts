@@ -2,6 +2,7 @@ export type AnalyticsSet = {
   weightKg: number | null;
   reps: number | null;
   rpe: number | null;
+  isWarmup?: boolean;
 };
 
 export type AnalyticsExercise = {
@@ -9,6 +10,7 @@ export type AnalyticsExercise = {
   name: string;
   templateId: string | null;
   muscleGroup: string | null;
+  secondaryMuscleGroups?: string[];
   isBodyweight?: boolean;
   sets: AnalyticsSet[];
 };
@@ -46,6 +48,8 @@ export type BodyweightCoverage = {
 export type ExerciseSummary = TrainingTotals & {
   exerciseKey: string;
   exerciseName: string;
+  muscleGroup: string;
+  secondaryMuscleGroups: string[];
   maxLoadKg: number | null;
   highLoadPrDates: string[];
 };
@@ -91,6 +95,8 @@ type MutableTotals = TrainingTotals & { rpeTotal: number; rpeCount: number };
 type MutableExercise = MutableTotals & {
   exerciseKey: string;
   exerciseName: string;
+  muscleGroup: string;
+  secondaryMuscleGroups: string[];
   workoutIds: Set<string>;
   maxLoadKg: number | null;
   highLoadPrDates: Set<string>;
@@ -114,24 +120,43 @@ export function calculateTrainingPeriod(workouts: AnalyticsWorkout[]): TrainingP
     const date = workout.startedAt.toISOString().slice(0, 10);
     for (const exercise of workout.exercises) {
       const exerciseKey = exercise.templateId || exercise.name.trim().toLocaleLowerCase();
+      const muscleGroup = exercise.muscleGroup?.trim() || unknownMuscleGroup;
       const exerciseSummary =
-        exercises.get(exerciseKey) || emptyExercise(exerciseKey, exercise.name);
+        exercises.get(exerciseKey) ||
+        emptyExercise(
+          exerciseKey,
+          exercise.name,
+          muscleGroup,
+          exercise.secondaryMuscleGroups ?? [],
+        );
       exercises.set(exerciseKey, exerciseSummary);
       exerciseSummary.workoutIds.add(workout.id);
-      const muscleGroup = exercise.muscleGroup?.trim() || unknownMuscleGroup;
       const muscleSummary = muscleGroups.get(muscleGroup) || emptyMuscleGroup(muscleGroup);
       muscleGroups.set(muscleGroup, muscleSummary);
 
       for (const set of exercise.sets) {
+        if (set.isWarmup) continue;
         totals.setCount += 1;
         exerciseSummary.setCount += 1;
         muscleSummary.setCount += 1;
+        for (const secondaryMuscleGroup of exercise.secondaryMuscleGroups ?? []) {
+          const secondary =
+            muscleGroups.get(secondaryMuscleGroup) || emptyMuscleGroup(secondaryMuscleGroup);
+          secondary.setCount += 0.5;
+          muscleGroups.set(secondaryMuscleGroup, secondary);
+        }
 
         const reps = validNumber(set.reps);
         if (reps !== null) {
           totals.repCount += reps;
           exerciseSummary.repCount += reps;
           muscleSummary.repCount += reps;
+          for (const secondaryMuscleGroup of exercise.secondaryMuscleGroups ?? []) {
+            const secondary =
+              muscleGroups.get(secondaryMuscleGroup) || emptyMuscleGroup(secondaryMuscleGroup);
+            secondary.repCount += reps;
+            muscleGroups.set(secondaryMuscleGroup, secondary);
+          }
         }
 
         const externalWeightKg = validNumber(set.weightKg) ?? 0;
@@ -149,6 +174,12 @@ export function calculateTrainingPeriod(workouts: AnalyticsWorkout[]): TrainingP
           totals.volumeKg += volumeKg;
           exerciseSummary.volumeKg += volumeKg;
           muscleSummary.volumeKg += volumeKg;
+          for (const secondaryMuscleGroup of exercise.secondaryMuscleGroups ?? []) {
+            const secondary =
+              muscleGroups.get(secondaryMuscleGroup) || emptyMuscleGroup(secondaryMuscleGroup);
+            secondary.volumeKg += volumeKg;
+            muscleGroups.set(secondaryMuscleGroup, secondary);
+          }
           if (exercise.isBodyweight) {
             if (bodyWeightKg === null)
               totals.bodyweightCoverage.externalLoadOnlyVolumeKg += volumeKg;
@@ -185,6 +216,8 @@ export function calculateTrainingPeriod(workouts: AnalyticsWorkout[]): TrainingP
         workoutCount: exercise.workoutIds.size,
         exerciseKey: exercise.exerciseKey,
         exerciseName: exercise.exerciseName,
+        muscleGroup: exercise.muscleGroup,
+        secondaryMuscleGroups: exercise.secondaryMuscleGroups,
         maxLoadKg: exercise.maxLoadKg,
         highLoadPrDates: [...exercise.highLoadPrDates].sort(),
       }))
@@ -254,11 +287,18 @@ function emptyTotals(): MutableTotals {
   };
 }
 
-function emptyExercise(exerciseKey: string, exerciseName: string): MutableExercise {
+function emptyExercise(
+  exerciseKey: string,
+  exerciseName: string,
+  muscleGroup: string,
+  secondaryMuscleGroups: string[],
+): MutableExercise {
   return {
     ...emptyTotals(),
     exerciseKey,
     exerciseName,
+    muscleGroup,
+    secondaryMuscleGroups,
     workoutIds: new Set(),
     maxLoadKg: null,
     highLoadPrDates: new Set(),

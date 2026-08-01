@@ -18,6 +18,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      target: development
     env_file:
       - path: apps/api/.env
         required: true
@@ -26,12 +27,20 @@ services:
       - -c
       - >-
         export DATABASE_URL="postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}?schema=public";
-        npx prisma migrate deploy && node dist/main.js
+        pnpm --filter @hevy/api prisma:generate && pnpm --filter @hevy/api exec prisma migrate deploy && pnpm --filter @hevy/analytics build && pnpm --filter @hevy/api build && (pnpm --filter @hevy/analytics exec tsc -p tsconfig.json --watch & pnpm --filter @hevy/api exec tsc -p tsconfig.build.json --watch & node --watch apps/api/dist/main.js)
     ports:
       - '3000:3000'
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - .:/app
+      - api_node_modules:/app/node_modules
+      - api_app_node_modules:/app/apps/api/node_modules
+      - api_analytics_node_modules:/app/packages/analytics/node_modules
 
 volumes:
   postgres_data:
+  api_node_modules:
+  api_app_node_modules:
+  api_analytics_node_modules:

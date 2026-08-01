@@ -65,6 +65,36 @@
               }
             }
           ]
+        },
+        {
+          "name": "Get Hevy-imported measurements for a period",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/measurements?from=2026-07-20&to=2026-07-26",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "measurements"],
+              "query": [
+                { "key": "from", "value": "2026-07-20" },
+                { "key": "to", "value": "2026-07-26" }
+              ]
+            },
+            "description": "Reads locally imported Hevy measurements only; it never contacts Hevy."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns an array without secrets', function () { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

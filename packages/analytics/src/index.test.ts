@@ -137,6 +137,35 @@ describe('calculateTrainingPeriod', () => {
       },
     });
   });
+
+  it('excludes warm-up sets and credits secondary muscles with reps, volume, and half a set', () => {
+    const result = calculateTrainingPeriod([
+      {
+        id: 'upper',
+        title: 'Upper',
+        startedAt: new Date('2026-07-20'),
+        exercises: [
+          {
+            id: 'bench',
+            templateId: 'bench',
+            name: 'Bench Press',
+            muscleGroup: 'chest',
+            secondaryMuscleGroups: ['triceps', 'front_delts'],
+            sets: [
+              { weightKg: 40, reps: 10, rpe: null, isWarmup: true },
+              { weightKg: 80, reps: 8, rpe: null },
+            ],
+          },
+        ],
+      },
+    ]);
+    expect(result.totals).toMatchObject({ setCount: 1, repCount: 8, volumeKg: 640 });
+    expect(result.muscleGroups).toEqual([
+      { muscleGroup: 'chest', setCount: 1, repCount: 8, volumeKg: 640 },
+      { muscleGroup: 'front_delts', setCount: 0.5, repCount: 8, volumeKg: 640 },
+      { muscleGroup: 'triceps', setCount: 0.5, repCount: 8, volumeKg: 640 },
+    ]);
+  });
   it('calculates deterministic volume, set, rep, RPE, PR, and muscle-group facts', () => {
     expect(calculateTrainingPeriod(workouts)).toEqual({
       totals: {
@@ -157,6 +186,8 @@ describe('calculateTrainingPeriod', () => {
         {
           exerciseKey: 'bench',
           exerciseName: 'Bench Press',
+          muscleGroup: 'chest',
+          secondaryMuscleGroups: [],
           workoutCount: 2,
           setCount: 4,
           repCount: 31,
@@ -175,6 +206,8 @@ describe('calculateTrainingPeriod', () => {
         {
           exerciseKey: 'carry',
           exerciseName: 'Carry',
+          muscleGroup: 'Unclassified',
+          secondaryMuscleGroups: [],
           workoutCount: 1,
           setCount: 1,
           repCount: 0,

@@ -92,4 +92,31 @@ describe('DashboardAnalyticsService', () => {
       bodyweightCoverage: { setsWithBodyWeight: 1, effectiveVolumeKg: 775 },
     });
   });
+
+  it('returns imported measurement history only in the requested inclusive range', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const service = new DashboardAnalyticsService({ hevyBodyMeasurement: { findMany } } as never);
+
+    await expect(
+      service.measurementHistory({ from: '2026-07-20', to: '2026-07-26' }),
+    ).resolves.toEqual([]);
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        date: {
+          gte: new Date('2026-07-20T00:00:00.000Z'),
+          lt: new Date('2026-07-27T00:00:00.000Z'),
+        },
+      },
+      orderBy: { date: 'asc' },
+      select: {
+        date: true,
+        weightKg: true,
+        bodyFatPercentage: true,
+        chestCm: true,
+        waistCm: true,
+        hipsCm: true,
+        bicepCm: true,
+      },
+    });
+  });
 });

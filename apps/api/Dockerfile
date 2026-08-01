@@ -8,6 +8,11 @@ RUN pnpm install --frozen-lockfile=false
 COPY . .
 RUN pnpm --filter @hevy/analytics build && pnpm --filter @hevy/api prisma:generate && pnpm --filter @hevy/api build
 
+# The Compose development service uses this stage with a bind-mounted workspace.
+# It retains tsx and the Prisma CLI so source edits restart the API without an image rebuild.
+FROM build AS development
+WORKDIR /app
+
 FROM node:22-alpine
 WORKDIR /app
 RUN corepack enable

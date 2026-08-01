@@ -71,6 +71,23 @@ function dateOffset(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function dateStartOfYear() {
+  return `${new Date().getFullYear()}-01-01`;
+}
+
+function dateStartOfWeek() {
+  const date = new Date();
+  const weekday = date.getDay() || 7;
+  date.setDate(date.getDate() - weekday + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function dateStartOfMonth() {
+  const date = new Date();
+  date.setDate(1);
+  return date.toISOString().slice(0, 10);
+}
+
 function formatNumber(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 }
@@ -91,17 +108,31 @@ const metricLabels: Record<MuscleMetric, string> = {
 function MuscleGroupBars({
   groups,
   metric,
+  selected,
+  onSelect,
 }: {
   groups: MuscleGroupAnalytics[];
   metric: MuscleMetric;
+  selected: string | undefined;
+  onSelect: (muscleGroup: string) => void;
 }) {
-  const maximum = Math.max(...groups.map((group) => group[metric]), 1);
+  const ranked = [...groups].sort(
+    (left, right) =>
+      right[metric] - left[metric] || left.muscleGroup.localeCompare(right.muscleGroup),
+  );
+  const maximum = Math.max(...ranked.map((group) => group[metric]), 1);
   if (groups.length === 0)
     return <Text color="fg.muted">No muscle-group volume in this range.</Text>;
   return (
     <Stack gap="2">
-      {groups.map((group) => (
-        <Box key={group.muscleGroup}>
+      {ranked.map((group) => (
+        <Button
+          key={group.muscleGroup}
+          aria-pressed={selected === group.muscleGroup}
+          justifyContent="stretch"
+          onClick={() => onSelect(group.muscleGroup)}
+          variant={selected === group.muscleGroup ? 'subtle' : 'ghost'}
+        >
           <Stack direction="row" justify="space-between" fontSize="sm">
             <Text>{group.muscleGroup.replace('_', ' ')}</Text>
             <Text>
@@ -118,7 +149,7 @@ function MuscleGroupBars({
               w={`${(group[metric] / maximum) * 100}%`}
             />
           </Box>
-        </Box>
+        </Button>
       ))}
     </Stack>
   );
@@ -134,6 +165,7 @@ export function App() {
   const [to, setTo] = useState(dateOffset(0));
   const [exercise, setExercise] = useState('');
   const [muscleMetric, setMuscleMetric] = useState<MuscleMetric>('volumeKg');
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<string>();
 
   const statusQuery = useQuery({ queryKey: ['api-status'], queryFn: api.status });
   const healthEntriesQuery = useQuery({
@@ -148,6 +180,10 @@ export function App() {
   const historyQuery = useQuery({
     queryKey: ['workout-history', from, to],
     queryFn: () => api.workoutHistory(from, to),
+  });
+  const measurementsQuery = useQuery({
+    queryKey: ['body-measurements', from, to],
+    queryFn: () => api.bodyMeasurements(from, to),
   });
   const trendQuery = useQuery({
     queryKey: ['exercise-trend', from, to, exercise],
@@ -222,6 +258,20 @@ export function App() {
     [entries, from, to],
   );
   const overview = overviewQuery.data?.current ? overviewQuery.data : undefined;
+  const selectedMuscleExercises = useMemo(
+    () =>
+      overview?.current.exercises.filter(
+        (item) =>
+          item.muscleGroup === selectedMuscleGroup ||
+          (item.secondaryMuscleGroups ?? []).includes(selectedMuscleGroup ?? ''),
+      ) ?? [],
+    [overview, selectedMuscleGroup],
+  );
+  const exerciseOptions = overview?.current.exercises ?? [];
+  const applyRange = (nextFrom: string) => {
+    setFrom(nextFrom);
+    setTo(dateOffset(0));
+  };
 
   return (
     <Box bg="bg.subtle" minH="100vh" p={{ base: 6, md: 12 }}>
@@ -237,10 +287,6 @@ export function App() {
               <Badge alignSelf="start" colorPalette={color}>
                 {state}
               </Badge>
-              <Text color="fg.muted" fontSize="sm">
-                The dashboard only checks the local API health endpoint. It does not sync Hevy or
-                run analysis automatically.
-              </Text>
             </Stack>
           </Card.Body>
         </Card.Root>
@@ -249,12 +295,22 @@ export function App() {
             <Stack direction={{ base: 'column', md: 'row' }} justify="space-between">
               <Box>
                 <Heading size="md">Training dashboard</Heading>
-                <Text color="fg.muted" fontSize="sm">
-                  These charts read local data only. Changing filters never syncs Hevy or contacts
-                  ChatGPT.
-                </Text>
               </Box>
               <Stack direction="row" align="end">
+                <Stack gap="1">
+                  <Text fontSize="sm">Quick range</Text>
+                  <Stack direction="row">
+                    <Button size="xs" onClick={() => applyRange(dateStartOfWeek())}>
+                      This week
+                    </Button>
+                    <Button size="xs" onClick={() => applyRange(dateStartOfMonth())}>
+                      This month
+                    </Button>
+                    <Button size="xs" onClick={() => applyRange(dateStartOfYear())}>
+                      YTD
+                    </Button>
+                  </Stack>
+                </Stack>
                 <Box>
                   <label htmlFor="dashboard-from">From</label>
                   <Input
@@ -313,18 +369,6 @@ export function App() {
                     </Card.Root>
                   ))}
                 </SimpleGrid>
-                {overview.current.totals.bodyweightCoverage.setCount > 0 && (
-                  <Text color="fg.muted" fontSize="sm">
-                    Bodyweight coverage:{' '}
-                    {overview.current.totals.bodyweightCoverage.setsWithBodyWeight} of{' '}
-                    {overview.current.totals.bodyweightCoverage.setCount} sets use an imported Hevy
-                    weight (
-                    {formatNumber(overview.current.totals.bodyweightCoverage.effectiveVolumeKg)} kg
-                    effective volume).
-                    {overview.current.totals.bodyweightCoverage.setsWithoutBodyWeight > 0 &&
-                      ` ${overview.current.totals.bodyweightCoverage.setsWithoutBodyWeight} set${overview.current.totals.bodyweightCoverage.setsWithoutBodyWeight === 1 ? '' : 's'} have external-load volume only; no body weight was estimated.`}
-                  </Text>
-                )}
                 <SimpleGrid columns={{ base: 1, lg: 2 }} gap="6">
                   <Box>
                     <Stack direction={{ base: 'column', sm: 'row' }} justify="space-between" mb="3">
@@ -345,18 +389,57 @@ export function App() {
                     <Text color="fg.muted" fontSize="xs" mb="3">
                       Bars are relative within the selected metric. Hover a bar for its exact value.
                     </Text>
-                    <MuscleGroupBars groups={overview.current.muscleGroups} metric={muscleMetric} />
+                    <MuscleGroupBars
+                      groups={overview.current.muscleGroups}
+                      metric={muscleMetric}
+                      onSelect={setSelectedMuscleGroup}
+                      selected={selectedMuscleGroup}
+                    />
                   </Box>
                   <Box>
+                    <Heading size="sm" mb="3">
+                      {selectedMuscleGroup ? `${selectedMuscleGroup} exercises` : 'Muscle details'}
+                    </Heading>
+                    {selectedMuscleGroup ? (
+                      selectedMuscleExercises.length ? (
+                        <Stack gap="1" mb="6">
+                          {selectedMuscleExercises.map((item) => (
+                            <Text key={item.exerciseKey} fontSize="sm">
+                              {item.exerciseName}: {formatNumber(item.volumeKg)} kg ·{' '}
+                              {item.setCount} sets
+                            </Text>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Text color="fg.muted" fontSize="sm" mb="6">
+                          No imported exercises for this group.
+                        </Text>
+                      )
+                    ) : (
+                      <Text color="fg.muted" fontSize="sm" mb="6">
+                        Select a ranked group to inspect its imported exercises.
+                      </Text>
+                    )}
                     <Heading size="sm" mb="3">
                       Exercise progression
                     </Heading>
                     <Input
                       aria-label="Exercise filter"
+                      list="dashboard-exercise-options"
                       placeholder="Type an exercise name or template ID"
                       value={exercise}
                       onChange={(event) => setExercise(event.target.value)}
                     />
+                    <datalist id="dashboard-exercise-options">
+                      {exerciseOptions.map((item) => (
+                        <option key={item.exerciseKey} value={item.exerciseName}>
+                          {item.exerciseKey}
+                        </option>
+                      ))}
+                    </datalist>
+                    <Text color="fg.muted" fontSize="xs" mt="1">
+                      Choose an imported exercise or enter its template ID manually.
+                    </Text>
                     {exercise ? (
                       trendQuery.isPending ? (
                         <Text mt="3">Loading exercise trend…</Text>
@@ -389,6 +472,41 @@ export function App() {
                     )}
                   </Box>
                 </SimpleGrid>
+                <Box>
+                  <Heading size="sm" mb="3">
+                    Hevy-imported measurements
+                  </Heading>
+                  {measurementsQuery.isPending ? (
+                    <Text color="fg.muted">Loading imported measurements…</Text>
+                  ) : measurementsQuery.isError ? (
+                    <Text color="red.fg">Unable to load imported measurements.</Text>
+                  ) : measurementsQuery.data?.length ? (
+                    <Table.Root size="sm">
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeader>Date</Table.ColumnHeader>
+                          <Table.ColumnHeader>Weight</Table.ColumnHeader>
+                          <Table.ColumnHeader>Waist</Table.ColumnHeader>
+                          <Table.ColumnHeader>Chest</Table.ColumnHeader>
+                          <Table.ColumnHeader>Bicep</Table.ColumnHeader>
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
+                        {measurementsQuery.data.map((measurement) => (
+                          <Table.Row key={measurement.date}>
+                            <Table.Cell>{measurement.date.slice(0, 10)}</Table.Cell>
+                            <Table.Cell>{measurement.weightKg ?? '—'} kg</Table.Cell>
+                            <Table.Cell>{measurement.waistCm ?? '—'} cm</Table.Cell>
+                            <Table.Cell>{measurement.chestCm ?? '—'} cm</Table.Cell>
+                            <Table.Cell>{measurement.bicepCm ?? '—'} cm</Table.Cell>
+                          </Table.Row>
+                        ))}
+                      </Table.Body>
+                    </Table.Root>
+                  ) : (
+                    <Text color="fg.muted">No Hevy-imported measurements in this range.</Text>
+                  )}
+                </Box>
                 <Box>
                   <Heading size="sm" mb="3">
                     Workout history
@@ -465,10 +583,6 @@ export function App() {
         <Card.Root>
           <Card.Header>
             <Heading size="md">Hevy data</Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Hevy is contacted only when you click the button below. No data is synced in the
-              background.
-            </Text>
           </Card.Header>
           <Card.Body>
             <Stack align="start" gap="3">

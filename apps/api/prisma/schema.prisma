@@ -73,6 +73,7 @@ model WorkoutSet {
   weightKg   Float?
   reps       Int?
   rpe        Float?
+  isWarmup   Boolean  @default(false)
   ordinal    Int
   exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
 

@@ -13,6 +13,7 @@ const HEVY_API_URL = 'https://api.hevyapp.com/v1';
 const PAGE_SIZE = 10;
 
 type HevySet = {
+  type?: string | null;
   weight_kg?: number | null;
   reps?: number | null;
   rpe?: number | null;
@@ -359,6 +360,7 @@ export class HevySyncService {
                 weightKg: set.weight_kg ?? null,
                 reps: set.reps ?? null,
                 rpe: set.rpe ?? null,
+                isWarmup: set.type === 'warmup',
               })),
             },
           };

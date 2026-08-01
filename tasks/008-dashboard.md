@@ -1,6 +1,6 @@
 # 008 — Dashboard visualisations
 
-**Status:** not started.
+**Status:** completed — manually verified on 2026-08-01.
 
 ## Deliverable
 

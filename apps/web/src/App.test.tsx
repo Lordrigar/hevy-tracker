@@ -13,6 +13,64 @@ const entry = {
   calorieTarget: 2600,
 };
 
+const overview = {
+  current: {
+    totals: {
+      workoutCount: 2,
+      setCount: 6,
+      repCount: 48,
+      volumeKg: 1200,
+      bodyweightCoverage: {
+        setCount: 0,
+        setsWithBodyWeight: 0,
+        setsWithoutBodyWeight: 0,
+        effectiveVolumeKg: 0,
+        externalLoadOnlyVolumeKg: 0,
+      },
+    },
+    exercises: [
+      {
+        exerciseKey: 'bench',
+        exerciseName: 'Bench Press',
+        muscleGroup: 'chest',
+        setCount: 3,
+        volumeKg: 900,
+        maxLoadKg: 80,
+        highLoadPrDates: ['2026-07-26'],
+        bodyweightCoverage: {
+          setCount: 0,
+          setsWithBodyWeight: 0,
+          setsWithoutBodyWeight: 0,
+          effectiveVolumeKg: 0,
+          externalLoadOnlyVolumeKg: 0,
+        },
+      },
+      {
+        exerciseKey: 'row',
+        exerciseName: 'Cable Row',
+        muscleGroup: 'back',
+        setCount: 3,
+        volumeKg: 300,
+        maxLoadKg: 50,
+        highLoadPrDates: [],
+        bodyweightCoverage: {
+          setCount: 0,
+          setsWithBodyWeight: 0,
+          setsWithoutBodyWeight: 0,
+          effectiveVolumeKg: 0,
+          externalLoadOnlyVolumeKg: 0,
+        },
+      },
+    ],
+    muscleGroups: [
+      { muscleGroup: 'chest', setCount: 3, repCount: 24, volumeKg: 900 },
+      { muscleGroup: 'back', setCount: 3, repCount: 24, volumeKg: 300 },
+    ],
+  },
+  previous: { totals: {} },
+  changes: { volumeKg: { change: 100 }, setCount: { change: 1 }, muscleGroups: [] },
+};
+
 function response(body: unknown, ok = true) {
   return Promise.resolve({ ok, statusText: 'Request failed', json: () => Promise.resolve(body) });
 }
@@ -132,5 +190,43 @@ describe('App', () => {
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/hevy/sync'))).toBe(true);
     });
+  });
+
+  it('supports range presets, ranked muscle details, autocomplete, and imported measurements', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.endsWith('/health/status'))
+          return response({ status: 'ok', database: 'connected' });
+        if (url.includes('/dashboard/overview')) return response(overview);
+        if (url.includes('/dashboard/workout-history')) return response([]);
+        if (url.includes('/dashboard/measurements'))
+          return response([
+            {
+              date: '2026-07-26T00:00:00.000Z',
+              weightKg: 80,
+              waistCm: 82,
+              chestCm: 100,
+              bicepCm: 38,
+            },
+          ]);
+        if (url.includes('/dashboard/exercise-trend'))
+          return response({ trend: [overview.current.exercises[0]] });
+        if (url.endsWith('/hevy/status'))
+          return response({ id: 'hevy', status: 'never', lastSyncedAt: null, message: null });
+        return response([]);
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp();
+
+    expect(await screen.findByText('Hevy-imported measurements')).toBeInTheDocument();
+    expect(screen.getByText('80 kg')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'This month' }));
+    expect(screen.getByLabelText('From')).toHaveValue(`${new Date().toISOString().slice(0, 8)}01`);
+    await user.click(screen.getByRole('button', { name: /chest/i }));
+    expect(await screen.findByText(/Bench Press: 900 kg/)).toBeInTheDocument();
+    await user.type(screen.getByRole('combobox', { name: 'Exercise filter' }), 'Bench Press');
+    expect(await screen.findByText('High-load PR dates: 2026-07-26')).toBeInTheDocument();
   });
 });

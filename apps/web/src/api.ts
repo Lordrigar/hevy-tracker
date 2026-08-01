@@ -60,6 +60,8 @@ export type TrainingTotals = {
 export type ExerciseAnalytics = TrainingTotals & {
   exerciseKey: string;
   exerciseName: string;
+  muscleGroup: string;
+  secondaryMuscleGroups: string[];
   maxLoadKg: number | null;
   highLoadPrDates: string[];
 };
@@ -96,6 +98,16 @@ export type WorkoutHistoryItem = {
   volumeKg: number;
 };
 
+export type BodyMeasurement = {
+  date: string;
+  weightKg: number | null;
+  bodyFatPercentage: number | null;
+  chestCm: number | null;
+  waistCm: number | null;
+  hipsCm: number | null;
+  bicepCm: number | null;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -124,6 +136,8 @@ export const api = {
     request<DashboardOverview>(`/dashboard/overview?from=${from}&to=${to}`),
   workoutHistory: (from: string, to: string) =>
     request<WorkoutHistoryItem[]>(`/dashboard/workout-history?from=${from}&to=${to}`),
+  bodyMeasurements: (from: string, to: string) =>
+    request<BodyMeasurement[]>(`/dashboard/measurements?from=${from}&to=${to}`),
   exerciseTrend: (from: string, to: string, exercise: string) =>
     request<{ trend: ExerciseAnalytics[] }>(
       `/dashboard/exercise-trend?from=${from}&to=${to}&exercise=${encodeURIComponent(exercise)}`,
