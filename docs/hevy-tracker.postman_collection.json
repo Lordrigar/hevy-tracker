@@ -264,6 +264,74 @@
       ]
     },
     {
+      "name": "Training analytics",
+      "description": "Read-only, deterministic calculations from already imported local workouts. These requests never contact Hevy or ChatGPT.",
+      "item": [
+        {
+          "name": "Get training overview for a period",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/overview?from=2026-07-20&to=2026-07-26",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "overview"],
+              "query": [
+                { "key": "from", "value": "2026-07-20" },
+                { "key": "to", "value": "2026-07-26" }
+              ]
+            },
+            "description": "Calculates current and equal-length previous periods from local PostgreSQL data. Inclusive YYYY-MM-DD dates are required."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns deterministic current and previous facts', function () { pm.response.to.have.status(200); var body = pm.response.json(); pm.expect(body).to.have.property('current'); pm.expect(body).to.have.property('previous'); pm.expect(body.changes).to.have.property('volumeKg'); });",
+                  "pm.test('does not return a secret', function () { pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get exercise trend for a period",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/exercise-trend?from=2026-07-20&to=2026-07-26&exercise=Cable%20Crunch",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "exercise-trend"],
+              "query": [
+                { "key": "from", "value": "2026-07-20" },
+                { "key": "to", "value": "2026-07-26" },
+                { "key": "exercise", "value": "Cable Crunch" }
+              ]
+            },
+            "description": "Returns matching local exercise aggregates, including max-load PR dates. Use an imported exercise name or template id."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns a trend array', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().trend).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Future endpoints",
       "description": "Add requests here only in the task that introduces their API endpoint. Each request must include a no-secret example body, expected status tests, and manual-trigger behaviour where relevant.",
       "item": []

@@ -1,6 +1,6 @@
 # 007 — Training analytics library
 
-**Status:** not started.
+**Status:** completed on 2026-08-01.
 
 ## Deliverable
 
@@ -15,6 +15,9 @@ Calculations execute only when an API endpoint or manual dashboard/MCP action re
 ## Manual verification
 
 Select several workouts in Hevy and calculate their volume manually; compare each aggregate to the API response.
+
+**Result (2026-08-01):** Passed. The project manager queried both analytics endpoints with curl
+against imported local data and confirmed the responses worked as expected.
 
 ## Done when
 

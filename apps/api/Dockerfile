@@ -3,9 +3,10 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/analytics/package.json packages/analytics/package.json
 RUN pnpm install --frozen-lockfile=false
 COPY . .
-RUN pnpm --filter @hevy/api prisma:generate && pnpm --filter @hevy/api build
+RUN pnpm --filter @hevy/analytics build && pnpm --filter @hevy/api prisma:generate && pnpm --filter @hevy/api build
 
 FROM node:22-alpine
 WORKDIR /app
@@ -15,5 +16,7 @@ COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/packages/analytics/package.json ./packages/analytics/package.json
+COPY --from=build /app/packages/analytics/dist ./packages/analytics/dist
 WORKDIR /app/apps/api
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
