@@ -21,6 +21,15 @@ export class ExerciseTrendQuery extends AnalyticsPeriodQuery {
   exercise!: string;
 }
 
+export type WorkoutHistoryItem = {
+  id: string;
+  title: string;
+  startedAt: Date;
+  exerciseCount: number;
+  setCount: number;
+  volumeKg: number;
+};
+
 @Injectable()
 export class DashboardAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -54,6 +63,29 @@ export class DashboardAnalyticsService {
           summary.exerciseKey === exercise || summary.exerciseName.toLocaleLowerCase() === exercise,
       ),
     };
+  }
+
+  async workoutHistory(query: AnalyticsPeriodQuery): Promise<WorkoutHistoryItem[]> {
+    const period = this.periodFrom(query);
+    const workouts = await this.workoutsIn(period.currentStart, period.currentEndExclusive);
+    return workouts
+      .map((workout) => ({
+        id: workout.id,
+        title: workout.title,
+        startedAt: workout.startedAt,
+        exerciseCount: workout.exercises.length,
+        setCount: workout.exercises.reduce((count, exercise) => count + exercise.sets.length, 0),
+        volumeKg: workout.exercises.reduce(
+          (total, exercise) =>
+            total +
+            exercise.sets.reduce(
+              (exerciseTotal, set) => exerciseTotal + (set.weightKg ?? 0) * (set.reps ?? 0),
+              0,
+            ),
+          0,
+        ),
+      }))
+      .reverse();
   }
 
   private async workoutsIn(start: Date, endExclusive: Date): Promise<AnalyticsWorkout[]> {
@@ -107,6 +139,11 @@ export class DashboardAnalyticsController {
   @Get('exercise-trend')
   exerciseTrend(@Query() query: ExerciseTrendQuery) {
     return this.analytics.exerciseTrend(query);
+  }
+
+  @Get('workout-history')
+  workoutHistory(@Query() query: AnalyticsPeriodQuery) {
+    return this.analytics.workoutHistory(query);
   }
 }
 

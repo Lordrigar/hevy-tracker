@@ -50,6 +50,53 @@ export type HevySyncResult = {
   syncedAt: string;
 };
 
+export type TrainingTotals = {
+  workoutCount: number;
+  setCount: number;
+  repCount: number;
+  volumeKg: number;
+  averageRpe: number | null;
+};
+
+export type ExerciseAnalytics = TrainingTotals & {
+  exerciseKey: string;
+  exerciseName: string;
+  maxLoadKg: number | null;
+  highLoadPrDates: string[];
+};
+
+export type MuscleGroupAnalytics = {
+  muscleGroup: string;
+  setCount: number;
+  repCount: number;
+  volumeKg: number;
+};
+
+export type DashboardOverview = {
+  current: {
+    totals: TrainingTotals;
+    exercises: ExerciseAnalytics[];
+    muscleGroups: MuscleGroupAnalytics[];
+  };
+  previous: { totals: TrainingTotals };
+  changes: {
+    volumeKg: { change: number | null };
+    setCount: { change: number | null };
+    muscleGroups: Array<
+      MuscleGroupAnalytics & { previousVolumeKg: number; volumeChangeKg: number }
+    >;
+  };
+};
+
+export type WorkoutHistoryItem = {
+  id: string;
+  title: string;
+  startedAt: string;
+  exerciseCount: number;
+  setCount: number;
+  volumeKg: number;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -74,4 +121,12 @@ export const api = {
     request<{ success: boolean }>(`/health/${id}`, { method: 'DELETE' }),
   hevyStatus: () => request<HevySyncStatus>('/hevy/status'),
   syncHevy: () => request<HevySyncResult>('/hevy/sync', { method: 'POST' }),
+  dashboardOverview: (from: string, to: string) =>
+    request<DashboardOverview>(`/dashboard/overview?from=${from}&to=${to}`),
+  workoutHistory: (from: string, to: string) =>
+    request<WorkoutHistoryItem[]>(`/dashboard/workout-history?from=${from}&to=${to}`),
+  exerciseTrend: (from: string, to: string, exercise: string) =>
+    request<{ trend: ExerciseAnalytics[] }>(
+      `/dashboard/exercise-trend?from=${from}&to=${to}&exercise=${encodeURIComponent(exercise)}`,
+    ),
 };

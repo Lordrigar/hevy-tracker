@@ -2,7 +2,7 @@
 
 ## Product outcome
 
-Build a local-only personal training analytics application. It manually imports a single Hevy Pro account on the dashboard owner's request, combines workout data with manually entered health data, visualizes deterministic progress metrics, and exposes those computed facts through a local MCP server for user-requested ChatGPT analysis.
+Build a local-only personal training analytics application. It manually imports a single Hevy Pro account on the dashboard owner's request, treats Hevy as the source of truth for body measurements, combines those measurements with locally entered steps and calorie data, visualizes deterministic progress metrics, and exposes those computed facts through a local MCP server for user-requested ChatGPT analysis.
 
 ## Architecture decisions
 
@@ -25,30 +25,31 @@ Tasks live in [`tasks/`](tasks/). Complete only one task at a time: implement it
 5. [005 — Hevy API client and initial sync](tasks/005-hevy-initial-sync.md)
 6. [006 — Incremental sync and audit log](tasks/006-incremental-sync.md)
 7. [007 — Training analytics library](tasks/007-training-analytics.md)
-8. [008 — Dashboard visualisations](tasks/008-dashboard.md)
-9. [009 — Weekly report workflow](tasks/009-weekly-report.md)
-10. [010 — Local MCP server and dashboard resource](tasks/010-mcp-server.md)
-11. [011 — Codex skills and workflows](tasks/011-agent-assets.md)
-12. [012 — Test fixtures, end-to-end checks, and handoff](tasks/012-quality-handoff.md)
+8. [008a — Effective-load analytics and Hevy measurement ownership](tasks/008a-effective-load.md)
+9. [008 — Dashboard visualisations](tasks/008-dashboard.md)
+10. [009 — Weekly report workflow](tasks/009-weekly-report.md)
+11. [010 — Local MCP server and dashboard resource](tasks/010-mcp-server.md)
+12. [011 — Codex skills and workflows](tasks/011-agent-assets.md)
+13. [012 — Test fixtures, end-to-end checks, and handoff](tasks/012-quality-handoff.md)
 
 ## Core interfaces
 
-- `POST /api/health`, `GET /api/health`, `DELETE /api/health/:id` for daily health entries.
+- `POST /api/health`, `GET /api/health`, `DELETE /api/health/:id` for local daily steps and calorie entries only. Body measurements are imported read-only from Hevy.
 - `POST /api/hevy/sync`, `GET /api/hevy/status` for explicitly user-triggered local imports only.
 - `GET /api/dashboard/overview`, `GET /api/dashboard/exercise-trend`, and `GET /api/dashboard/weekly-report` for computed views.
 - MCP tools mirror read-only analytics endpoints and expose a clearly named sync action only on explicit user request. The dashboard exposes a separate manual action that prepares the current weekly facts for a ChatGPT conversation; it never calls a model itself.
 
 ## V1 reporting
 
-- Workout volume, total sets/reps, exercise progression, highest-load PRs, RPE average when available, and muscle-group volume.
+- Workout volume, total sets/reps, exercise progression, highest-load PRs, RPE average when available, and muscle-group volume. Bodyweight exercise volume uses the most recent Hevy body weight on or before each workout plus any recorded external load.
 - Current seven-day period compared to the immediately preceding equal-length period.
-- Weight, waist, chest, bicep, steps, calorie intake, and calorie target history.
+- Hevy-imported weight, waist, chest, bicep, and other available body-measurement history; locally entered steps, calorie intake, and calorie target history.
 - TDEE, body-fat estimates, adherence scoring, and target timelines are deferred; schema fields may support a later task but no health inference is shown in v1.
 
 ## Completion criteria
 
 - `docker compose up --build` starts PostgreSQL and the API from a clean checkout.
-- The React dashboard supports persisted health entries, visible **Sync Hevy data** and **Prepare weekly analysis** actions, plus readable loading/error/empty states.
+- The React dashboard supports Hevy-imported body measurements, persisted local steps/calorie entries, visible **Sync Hevy data** and **Prepare weekly analysis** actions, plus readable loading/error/empty states.
 - Repeated user-triggered syncs do not duplicate workouts; each creates an auditable status record. A weekly report is generated or refreshed only when the user explicitly requests it.
 - MCP responses contain computed facts, no credentials, and are invoked by the user from a local ChatGPT developer configuration.
 - Every task’s manual check is recorded as passed before the next task begins.
