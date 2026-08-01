@@ -88,6 +88,7 @@ export function App() {
     queryKey: ['health-entries'],
     queryFn: api.listHealthEntries,
   });
+  const hevyStatusQuery = useQuery({ queryKey: ['hevy-status'], queryFn: api.hevyStatus });
   const saveEntry = useMutation({
     mutationFn: api.saveHealthEntry,
     onSuccess: async () => {
@@ -102,6 +103,12 @@ export function App() {
     mutationFn: api.deleteHealthEntry,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['health-entries'] });
+    },
+  });
+  const syncHevy = useMutation({
+    mutationFn: api.syncHevy,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['hevy-status'] });
     },
   });
 
@@ -163,6 +170,54 @@ export function App() {
                 The dashboard only checks the local API health endpoint. It does not sync Hevy or
                 run analysis automatically.
               </Text>
+            </Stack>
+          </Card.Body>
+        </Card.Root>
+        <Card.Root>
+          <Card.Header>
+            <Heading size="md">Hevy data</Heading>
+            <Text color="fg.muted" fontSize="sm">
+              Hevy is contacted only when you click the button below. No data is synced in the
+              background.
+            </Text>
+          </Card.Header>
+          <Card.Body>
+            <Stack align="start" gap="3">
+              {hevyStatusQuery.isPending ? (
+                <Text color="fg.muted">Checking local sync status…</Text>
+              ) : hevyStatusQuery.isError ? (
+                <Text color="red.fg">Unable to load the local Hevy sync status.</Text>
+              ) : (
+                <>
+                  <Badge colorPalette={hevyStatusQuery.data?.status === 'failed' ? 'red' : 'blue'}>
+                    {hevyStatusQuery.data?.status ?? 'never'}
+                  </Badge>
+                  <Text color="fg.muted" fontSize="sm">
+                    {hevyStatusQuery.data?.lastSyncedAt
+                      ? `Last synced: ${new Date(hevyStatusQuery.data.lastSyncedAt).toLocaleString()}`
+                      : 'No Hevy import has been run yet.'}
+                  </Text>
+                  {hevyStatusQuery.data?.message && (
+                    <Text color="fg.muted" fontSize="sm">
+                      {hevyStatusQuery.data.message}
+                    </Text>
+                  )}
+                </>
+              )}
+              {syncHevy.isError && (
+                <Text color="red.fg">
+                  {syncHevy.error instanceof Error
+                    ? syncHevy.error.message
+                    : 'Unable to import Hevy data.'}
+                </Text>
+              )}
+              <Button
+                colorPalette="blue"
+                loading={syncHevy.isPending}
+                onClick={() => syncHevy.mutate()}
+              >
+                Sync Hevy data
+              </Button>
             </Stack>
           </Card.Body>
         </Card.Root>

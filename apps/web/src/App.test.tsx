@@ -106,4 +106,34 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText('Database unavailable')).toBeInTheDocument());
   });
+
+  it('contacts Hevy only after the user explicitly requests a sync', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/hevy/sync')) {
+        expect(init?.method).toBe('POST');
+        return response({
+          status: 'succeeded',
+          imported: 3,
+          message: 'Imported fixture data.',
+          syncedAt: '2026-08-01T10:00:00.000Z',
+        });
+      }
+      if (url.endsWith('/health/status')) return response({ status: 'ok', database: 'connected' });
+      if (url.endsWith('/hevy/status')) {
+        return response({ id: 'hevy', status: 'never', lastSyncedAt: null, message: null });
+      }
+      return response([]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderApp();
+
+    await screen.findByText('No Hevy import has been run yet.');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/hevy/sync'))).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Sync Hevy data' }));
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/hevy/sync'))).toBe(true);
+    });
+  });
 });

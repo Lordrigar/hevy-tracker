@@ -1,0 +1,22 @@
+{
+  "page": 1,
+  "page_count": 1,
+  "workouts": [
+    {
+      "id": "workout_fixture_1",
+      "title": "Fixture upper body",
+      "start_time": "2026-07-20T18:00:00.000Z",
+      "end_time": "2026-07-20T19:00:00.000Z",
+      "exercises": [
+        {
+          "exercise_template_id": "template_bench",
+          "title": "Bench Press",
+          "sets": [
+            { "type": "normal", "weight_kg": 80, "reps": 8, "rpe": 8 },
+            { "type": "normal", "weight_kg": 80, "reps": 7, "rpe": 8.5 }
+          ]
+        }
+      ]
+    }
+  ]
+}

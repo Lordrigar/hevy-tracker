@@ -35,6 +35,29 @@ model Workout {
   @@index([startedAt])
 }
 
+model HevyExerciseTemplate {
+  id                    String   @id
+  title                 String
+  type                  String?
+  primaryMuscleGroup    String?
+  secondaryMuscleGroups Json?
+  isCustom              Boolean?
+  raw                   Json
+  updatedAt             DateTime @updatedAt
+}
+
+model HevyBodyMeasurement {
+  date              DateTime @id @db.Date
+  weightKg          Float?
+  bodyFatPercentage Float?
+  chestCm           Float?
+  waistCm           Float?
+  hipsCm            Float?
+  bicepCm           Float?
+  raw               Json
+  updatedAt         DateTime @updatedAt
+}
+
 model Exercise {
   id          String       @id @default(cuid())
   workoutId   String

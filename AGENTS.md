@@ -2,6 +2,7 @@
 
 - Use pnpm from the repository root. Do not commit `.env`, PostgreSQL volumes, or generated credentials.
 - API changes must keep secrets out of REST and MCP responses. MCP tools return computed facts only.
+- Hevy integration is read-only in the current release. It may call only documented `GET` endpoints to import data; do not add Hevy create, update, or delete operations without a separately approved task and manual confirmation flow.
 - Run `pnpm test` before handoff. Use the `test-runner` skill for focused validation and `debug-logs` for sync/API failures.
 - Use `pnpm format` after changing source files; do not hand-format around Prettier. ESLint and `pnpm format:check` are mandatory through the quality gate.
 - The intended local flow is Docker Compose for PostgreSQL/API and `pnpm --filter @hevy/web dev` for the UI.

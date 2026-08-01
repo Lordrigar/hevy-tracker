@@ -203,6 +203,66 @@
       ]
     },
     {
+      "name": "Hevy manual import",
+      "description": "These requests are the only local API actions that contact Hevy. Run sync only when you intentionally want to download fresh data. The key remains in the local API environment and is never sent by Postman.",
+      "item": [
+        {
+          "name": "Get Hevy sync status",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hevy/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["hevy", "status"]
+            },
+            "description": "Reads the local sync state only; it never contacts Hevy."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns local sync status', function () { pm.response.to.have.status(200); });",
+                  "pm.test('does not return a secret', function () { pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Hevy data (manual trigger)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hevy/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["hevy", "sync"]
+            },
+            "description": "Explicitly downloads paginated workouts, exercise templates, and body measurements from Hevy. This may use your Hevy API quota; run it only when you request fresh data."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns successful import data', function () { pm.response.to.have.status(201); });",
+                  "pm.test('returns an import count without secrets', function () { var body = pm.response.json(); pm.expect(body.status).to.eql('succeeded'); pm.expect(body.imported).to.be.a('number'); pm.expect(JSON.stringify(body)).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Future endpoints",
       "description": "Add requests here only in the task that introduces their API endpoint. Each request must include a no-secret example body, expected status tests, and manual-trigger behaviour where relevant.",
       "item": []

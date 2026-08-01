@@ -1,0 +1,15 @@
+{
+  "page": 1,
+  "page_count": 1,
+  "body_measurements": [
+    {
+      "date": "2026-07-20",
+      "weight_kg": 80.4,
+      "body_fat_percentage": 18.2,
+      "chest": 101,
+      "waist": 82,
+      "hips": 94,
+      "biceps": 38
+    }
+  ]
+}

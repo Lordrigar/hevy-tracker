@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --passWithNoTests --exclude '**/*.integration.test.ts'",
-    "test:integration": "vitest run --passWithNoTests src/database.integration.test.ts src/health.integration.test.ts",
+    "test:integration": "vitest run --passWithNoTests src/database.integration.test.ts src/health.integration.test.ts src/hevy.integration.test.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",

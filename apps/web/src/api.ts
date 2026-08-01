@@ -23,6 +23,20 @@ export type HealthEntryInput = {
   calorieTarget?: number;
 };
 
+export type HevySyncStatus = {
+  id: string;
+  lastSyncedAt: string | null;
+  status: 'never' | 'succeeded' | 'failed';
+  message: string | null;
+};
+
+export type HevySyncResult = {
+  status: 'succeeded';
+  imported: number;
+  message: string;
+  syncedAt: string;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -45,4 +59,6 @@ export const api = {
     request<HealthEntry>('/health', { method: 'POST', body: JSON.stringify(entry) }),
   deleteHealthEntry: (id: string) =>
     request<{ success: boolean }>(`/health/${id}`, { method: 'DELETE' }),
+  hevyStatus: () => request<HevySyncStatus>('/hevy/status'),
+  syncHevy: () => request<HevySyncResult>('/hevy/sync', { method: 'POST' }),
 };
