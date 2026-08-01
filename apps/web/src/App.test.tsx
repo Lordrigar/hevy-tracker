@@ -8,10 +8,6 @@ import { App } from './App';
 const entry = {
   id: 'health-entry-id',
   date: '2026-07-26T00:00:00.000Z',
-  weightKg: 80.2,
-  waistCm: 82,
-  chestCm: null,
-  bicepCm: null,
   steps: 8000,
   calories: 2500,
   calorieTarget: 2600,
@@ -55,12 +51,13 @@ describe('App', () => {
     renderApp();
 
     expect(
-      await screen.findByText('No health entries yet. Add your first daily entry above.'),
+      await screen.findByText('No daily entries yet. Add your first steps or calorie entry above.'),
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Steps')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Add health entry' }));
-    expect(screen.getByLabelText('Weight (kg)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add daily entry' }));
+    expect(screen.getByLabelText('Steps')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
   });
 
   it('opens a populated health-entry modal for editing', async () => {
@@ -75,17 +72,17 @@ describe('App', () => {
     const user = userEvent.setup();
     renderApp();
 
-    expect(await screen.findByText('80.2 kg')).toBeInTheDocument();
+    expect(await screen.findByText('8000')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(screen.getByLabelText('Weight (kg)')).toHaveValue(80.2);
+    expect(screen.getByLabelText('Steps')).toHaveValue(8000);
     expect(screen.getByLabelText('Date')).toHaveValue('2026-07-26');
   });
 
   it('shows client validation feedback before saving an invalid entry', async () => {
     const user = userEvent.setup();
     renderApp();
-    await screen.findByText('No health entries yet. Add your first daily entry above.');
-    await user.click(screen.getByRole('button', { name: 'Add health entry' }));
+    await screen.findByText('No daily entries yet. Add your first steps or calorie entry above.');
+    await user.click(screen.getByRole('button', { name: 'Add daily entry' }));
 
     await user.clear(screen.getByLabelText('Date'));
     await user.click(screen.getByRole('button', { name: 'Save entry' }));

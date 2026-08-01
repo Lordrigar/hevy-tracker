@@ -21,25 +21,36 @@ describe('Task 3 health-entry persistence', () => {
   it('creates, upserts, lists, updates, and deletes a daily entry', async () => {
     const created = await prisma.healthEntry.upsert({
       where: { date },
-      create: { date, weightKg: 80, steps: 7000 },
-      update: { weightKg: 80, steps: 7000 },
+      create: { date, steps: 7000 },
+      update: { steps: 7000 },
     });
     const upserted = await prisma.healthEntry.upsert({
       where: { date },
-      create: { date, weightKg: 81, steps: 8000 },
-      update: { weightKg: 81, steps: 8000 },
+      create: { date, steps: 8000 },
+      update: { steps: 8000 },
     });
     expect(upserted.id).toBe(created.id);
-    expect(upserted.weightKg).toBe(81);
+    expect(upserted.steps).toBe(8000);
 
     await expect(prisma.healthEntry.findMany({ where: { date } })).resolves.toHaveLength(1);
     const updated = await prisma.healthEntry.update({
       where: { id: created.id },
-      data: { waistCm: 82 },
+      data: { calories: 2500 },
     });
-    expect(updated.waistCm).toBe(82);
+    expect(updated.calories).toBe(2500);
 
     await prisma.healthEntry.delete({ where: { id: created.id } });
     await expect(prisma.healthEntry.findMany({ where: { date } })).resolves.toHaveLength(0);
+  });
+
+  it('keeps body-measurement columns out of the locally mutable health-entry table', async () => {
+    const columns = await prisma.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'HealthEntry'
+    `;
+    expect(columns.map((column) => column.column_name)).not.toEqual(
+      expect.arrayContaining(['weightKg', 'waistCm', 'chestCm', 'bicepCm']),
+    );
   });
 });

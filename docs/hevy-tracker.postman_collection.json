@@ -70,7 +70,7 @@
     },
     {
       "name": "Health entries",
-      "description": "Local database CRUD only. These requests never trigger a Hevy sync, weekly report, or ChatGPT analysis.",
+      "description": "Local database CRUD for steps, calories, and calorie targets only. Body measurements are imported read-only from Hevy. These requests never trigger a Hevy sync, weekly report, or ChatGPT analysis.",
       "item": [
         {
           "name": "Create or upsert daily entry",
@@ -80,7 +80,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"date\": \"2026-07-26\",\n  \"weightKg\": 80.2,\n  \"waistCm\": 82,\n  \"chestCm\": 102,\n  \"bicepCm\": 38,\n  \"steps\": 8000,\n  \"calories\": 2500,\n  \"calorieTarget\": 2600\n}"
+              "raw": "{\n  \"date\": \"2026-07-26\",\n  \"steps\": 8000,\n  \"calories\": 2500,\n  \"calorieTarget\": 2600\n}"
             },
             "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
             "description": "Creates an entry for the specified UTC date or updates the existing entry for that date."
@@ -128,7 +128,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"date\": \"2026-07-26\",\n  \"weightKg\": 79.8,\n  \"steps\": 9000\n}"
+              "raw": "{\n  \"date\": \"2026-07-26\",\n  \"steps\": 9000\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/health/{{healthEntryId}}",
@@ -183,7 +183,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"date\": \"invalid\",\n  \"weightKg\": 10,\n  \"steps\": -1\n}"
+              "raw": "{\n  \"date\": \"invalid\",\n  \"steps\": -1\n}"
             },
             "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
           },

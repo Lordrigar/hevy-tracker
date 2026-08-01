@@ -19,10 +19,6 @@ type FormValues = Record<keyof Omit<HealthEntryInput, 'date'> | 'date', string>;
 
 const initialForm = (): FormValues => ({
   date: new Date().toISOString().slice(0, 10),
-  weightKg: '',
-  waistCm: '',
-  chestCm: '',
-  bicepCm: '',
   steps: '',
   calories: '',
   calorieTarget: '',
@@ -35,10 +31,6 @@ const numberFields: {
   max: number;
   step?: number;
 }[] = [
-  { key: 'weightKg', label: 'Weight (kg)', min: 20, max: 400, step: 0.1 },
-  { key: 'waistCm', label: 'Waist (cm)', min: 20, max: 300, step: 0.1 },
-  { key: 'chestCm', label: 'Chest (cm)', min: 20, max: 300, step: 0.1 },
-  { key: 'bicepCm', label: 'Bicep (cm)', min: 10, max: 100, step: 0.1 },
   { key: 'steps', label: 'Steps', min: 0, max: 200000 },
   { key: 'calories', label: 'Calories', min: 0, max: 20000 },
   { key: 'calorieTarget', label: 'Calorie target', min: 0, max: 20000 },
@@ -47,10 +39,6 @@ const numberFields: {
 function toFormValues(entry: HealthEntry): FormValues {
   return {
     date: entry.date.slice(0, 10),
-    weightKg: entry.weightKg?.toString() ?? '',
-    waistCm: entry.waistCm?.toString() ?? '',
-    chestCm: entry.chestCm?.toString() ?? '',
-    bicepCm: entry.bicepCm?.toString() ?? '',
     steps: entry.steps?.toString() ?? '',
     calories: entry.calories?.toString() ?? '',
     calorieTarget: entry.calorieTarget?.toString() ?? '',
@@ -325,6 +313,18 @@ export function App() {
                     </Card.Root>
                   ))}
                 </SimpleGrid>
+                {overview.current.totals.bodyweightCoverage.setCount > 0 && (
+                  <Text color="fg.muted" fontSize="sm">
+                    Bodyweight coverage:{' '}
+                    {overview.current.totals.bodyweightCoverage.setsWithBodyWeight} of{' '}
+                    {overview.current.totals.bodyweightCoverage.setCount} sets use an imported Hevy
+                    weight (
+                    {formatNumber(overview.current.totals.bodyweightCoverage.effectiveVolumeKg)} kg
+                    effective volume).
+                    {overview.current.totals.bodyweightCoverage.setsWithoutBodyWeight > 0 &&
+                      ` ${overview.current.totals.bodyweightCoverage.setsWithoutBodyWeight} set${overview.current.totals.bodyweightCoverage.setsWithoutBodyWeight === 1 ? '' : 's'} have external-load volume only; no body weight was estimated.`}
+                  </Text>
+                )}
                 <SimpleGrid columns={{ base: 1, lg: 2 }} gap="6">
                   <Box>
                     <Stack direction={{ base: 'column', sm: 'row' }} justify="space-between" mb="3">
@@ -426,15 +426,13 @@ export function App() {
                 </Box>
                 <Box>
                   <Heading size="sm" mb="3">
-                    Weight and health trends
+                    Local steps and calorie trends
                   </Heading>
                   {healthInRange.length ? (
                     <Table.Root size="sm">
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeader>Date</Table.ColumnHeader>
-                          <Table.ColumnHeader>Weight</Table.ColumnHeader>
-                          <Table.ColumnHeader>Waist</Table.ColumnHeader>
                           <Table.ColumnHeader>Steps</Table.ColumnHeader>
                           <Table.ColumnHeader>Calories</Table.ColumnHeader>
                         </Table.Row>
@@ -443,8 +441,6 @@ export function App() {
                         {healthInRange.map((entry) => (
                           <Table.Row key={entry.id}>
                             <Table.Cell>{entry.date.slice(0, 10)}</Table.Cell>
-                            <Table.Cell>{entry.weightKg ?? '—'} kg</Table.Cell>
-                            <Table.Cell>{entry.waistCm ?? '—'} cm</Table.Cell>
                             <Table.Cell>{entry.steps ?? '—'}</Table.Cell>
                             <Table.Cell>{entry.calories ?? '—'}</Table.Cell>
                           </Table.Row>
@@ -526,13 +522,14 @@ export function App() {
           <Card.Header>
             <Stack direction={{ base: 'column', sm: 'row' }} justify="space-between">
               <Box>
-                <Heading size="md">Health history</Heading>
+                <Heading size="md">Steps and calorie history</Heading>
                 <Text color="fg.muted" fontSize="sm">
-                  Entries are stored locally. Saving does not sync Hevy or start an AI analysis.
+                  Body measurements are imported read-only from Hevy. These local entries store
+                  steps and calories only.
                 </Text>
               </Box>
               <Button alignSelf="start" colorPalette="blue" onClick={openCreateDialog}>
-                Add health entry
+                Add daily entry
               </Button>
             </Stack>
           </Card.Header>
@@ -541,14 +538,14 @@ export function App() {
             {healthEntriesQuery.isPending ? (
               <Text color="fg.muted">Loading health entries…</Text>
             ) : entries.length === 0 ? (
-              <Text color="fg.muted">No health entries yet. Add your first daily entry above.</Text>
+              <Text color="fg.muted">
+                No daily entries yet. Add your first steps or calorie entry above.
+              </Text>
             ) : (
               <Table.Root size="sm">
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>Date</Table.ColumnHeader>
-                    <Table.ColumnHeader>Weight</Table.ColumnHeader>
-                    <Table.ColumnHeader>Waist</Table.ColumnHeader>
                     <Table.ColumnHeader>Steps</Table.ColumnHeader>
                     <Table.ColumnHeader>Calories</Table.ColumnHeader>
                     <Table.ColumnHeader>Actions</Table.ColumnHeader>
@@ -558,8 +555,6 @@ export function App() {
                   {entries.map((entry) => (
                     <Table.Row key={entry.id}>
                       <Table.Cell>{entry.date.slice(0, 10)}</Table.Cell>
-                      <Table.Cell>{entry.weightKg ?? '—'} kg</Table.Cell>
-                      <Table.Cell>{entry.waistCm ?? '—'} cm</Table.Cell>
                       <Table.Cell>{entry.steps ?? '—'}</Table.Cell>
                       <Table.Cell>{entry.calories ?? '—'}</Table.Cell>
                       <Table.Cell>

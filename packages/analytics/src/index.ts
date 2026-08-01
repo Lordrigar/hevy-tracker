@@ -9,6 +9,7 @@ export type AnalyticsExercise = {
   name: string;
   templateId: string | null;
   muscleGroup: string | null;
+  isBodyweight?: boolean;
   sets: AnalyticsSet[];
 };
 
@@ -16,6 +17,7 @@ export type AnalyticsWorkout = {
   id: string;
   title: string;
   startedAt: Date;
+  bodyWeightKg?: number | null;
   exercises: AnalyticsExercise[];
 };
 
@@ -25,6 +27,20 @@ export type TrainingTotals = {
   repCount: number;
   volumeKg: number;
   averageRpe: number | null;
+  bodyweightCoverage: BodyweightCoverage;
+};
+
+/**
+ * Coverage and volume facts for imported bodyweight exercises. A missing body
+ * measurement never gets estimated: its volume contains recorded external load
+ * only, and is reported separately from effective bodyweight volume.
+ */
+export type BodyweightCoverage = {
+  setCount: number;
+  setsWithBodyWeight: number;
+  setsWithoutBodyWeight: number;
+  effectiveVolumeKg: number;
+  externalLoadOnlyVolumeKg: number;
 };
 
 export type ExerciseSummary = TrainingTotals & {
@@ -118,12 +134,29 @@ export function calculateTrainingPeriod(workouts: AnalyticsWorkout[]): TrainingP
           muscleSummary.repCount += reps;
         }
 
-        const weightKg = validNumber(set.weightKg);
+        const externalWeightKg = validNumber(set.weightKg) ?? 0;
+        const bodyWeightKg = exercise.isBodyweight
+          ? validNumber(workout.bodyWeightKg ?? null)
+          : null;
+        if (exercise.isBodyweight) {
+          addBodyweightSet(totals.bodyweightCoverage, bodyWeightKg);
+          addBodyweightSet(exerciseSummary.bodyweightCoverage, bodyWeightKg);
+        }
+        const weightKg =
+          bodyWeightKg === null ? validNumber(set.weightKg) : bodyWeightKg + externalWeightKg;
         if (weightKg !== null && reps !== null) {
           const volumeKg = weightKg * reps;
           totals.volumeKg += volumeKg;
           exerciseSummary.volumeKg += volumeKg;
           muscleSummary.volumeKg += volumeKg;
+          if (exercise.isBodyweight) {
+            if (bodyWeightKg === null)
+              totals.bodyweightCoverage.externalLoadOnlyVolumeKg += volumeKg;
+            else totals.bodyweightCoverage.effectiveVolumeKg += volumeKg;
+            if (bodyWeightKg === null)
+              exerciseSummary.bodyweightCoverage.externalLoadOnlyVolumeKg += volumeKg;
+            else exerciseSummary.bodyweightCoverage.effectiveVolumeKg += volumeKg;
+          }
         }
 
         if (weightKg !== null) {
@@ -209,6 +242,13 @@ function emptyTotals(): MutableTotals {
     repCount: 0,
     volumeKg: 0,
     averageRpe: null,
+    bodyweightCoverage: {
+      setCount: 0,
+      setsWithBodyWeight: 0,
+      setsWithoutBodyWeight: 0,
+      effectiveVolumeKg: 0,
+      externalLoadOnlyVolumeKg: 0,
+    },
     rpeTotal: 0,
     rpeCount: 0,
   };
@@ -234,6 +274,12 @@ function addRpe(totals: MutableTotals, rpe: number) {
   totals.rpeTotal += rpe;
 }
 
+function addBodyweightSet(coverage: BodyweightCoverage, bodyWeightKg: number | null) {
+  coverage.setCount += 1;
+  if (bodyWeightKg === null) coverage.setsWithoutBodyWeight += 1;
+  else coverage.setsWithBodyWeight += 1;
+}
+
 function finaliseTotals(totals: MutableTotals): TrainingTotals {
   return {
     workoutCount: totals.workoutCount,
@@ -241,6 +287,7 @@ function finaliseTotals(totals: MutableTotals): TrainingTotals {
     repCount: totals.repCount,
     volumeKg: totals.volumeKg,
     averageRpe: totals.rpeCount === 0 ? null : totals.rpeTotal / totals.rpeCount,
+    bodyweightCoverage: { ...totals.bodyweightCoverage },
   };
 }
 

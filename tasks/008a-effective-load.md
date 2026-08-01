@@ -1,6 +1,6 @@
 # 008a — Effective-load analytics and Hevy measurement ownership
 
-**Status:** not started.
+**Status:** completed — 2026-08-01. Manual verification confirmed by project manager.
 
 ## Deliverable
 

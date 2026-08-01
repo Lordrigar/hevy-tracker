@@ -10,10 +10,6 @@ datasource db {
 model HealthEntry {
   id            String   @id @default(cuid())
   date          DateTime @unique @db.Date
-  weightKg      Float?
-  waistCm       Float?
-  chestCm       Float?
-  bicepCm       Float?
   steps         Int?
   calories      Int?
   calorieTarget Int?

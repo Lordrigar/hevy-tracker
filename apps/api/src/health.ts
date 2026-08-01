@@ -11,36 +11,12 @@ import {
   Put,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { IsDateString, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { PrismaService } from './prisma.service';
 
 export class HealthEntryDto {
   @IsDateString()
   date!: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(20)
-  @Max(400)
-  weightKg?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(20)
-  @Max(300)
-  waistCm?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(20)
-  @Max(300)
-  chestCm?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(10)
-  @Max(100)
-  bicepCm?: number;
 
   @IsOptional()
   @IsInt()
@@ -104,10 +80,6 @@ export class HealthService {
 
   private dataFrom(dto: HealthEntryDto) {
     return {
-      weightKg: dto.weightKg,
-      waistCm: dto.waistCm,
-      chestCm: dto.chestCm,
-      bicepCm: dto.bicepCm,
       steps: dto.steps,
       calories: dto.calories,
       calorieTarget: dto.calorieTarget,

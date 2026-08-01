@@ -3,10 +3,6 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 export type HealthEntry = {
   id: string;
   date: string;
-  weightKg: number | null;
-  waistCm: number | null;
-  chestCm: number | null;
-  bicepCm: number | null;
   steps: number | null;
   calories: number | null;
   calorieTarget: number | null;
@@ -14,10 +10,6 @@ export type HealthEntry = {
 
 export type HealthEntryInput = {
   date: string;
-  weightKg?: number;
-  waistCm?: number;
-  chestCm?: number;
-  bicepCm?: number;
   steps?: number;
   calories?: number;
   calorieTarget?: number;
@@ -56,6 +48,13 @@ export type TrainingTotals = {
   repCount: number;
   volumeKg: number;
   averageRpe: number | null;
+  bodyweightCoverage: {
+    setCount: number;
+    setsWithBodyWeight: number;
+    setsWithoutBodyWeight: number;
+    effectiveVolumeKg: number;
+    externalLoadOnlyVolumeKg: number;
+  };
 };
 
 export type ExerciseAnalytics = TrainingTotals & {

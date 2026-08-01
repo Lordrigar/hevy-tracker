@@ -89,20 +89,32 @@ export class DashboardAnalyticsService {
   }
 
   private async workoutsIn(start: Date, endExclusive: Date): Promise<AnalyticsWorkout[]> {
-    const workouts = await this.prisma.workout.findMany({
-      where: { startedAt: { gte: start, lt: endExclusive } },
-      include: { exercises: { include: { sets: { orderBy: { ordinal: 'asc' } } } } },
-      orderBy: { startedAt: 'asc' },
-    });
+    const [workouts, templates, measurements] = await Promise.all([
+      this.prisma.workout.findMany({
+        where: { startedAt: { gte: start, lt: endExclusive } },
+        include: { exercises: { include: { sets: { orderBy: { ordinal: 'asc' } } } } },
+        orderBy: { startedAt: 'asc' },
+      }),
+      this.prisma.hevyExerciseTemplate.findMany(),
+      this.prisma.hevyBodyMeasurement.findMany({
+        where: { date: { lt: endExclusive } },
+        orderBy: { date: 'asc' },
+      }),
+    ]);
+    const templatesById = new Map(templates.map((template) => [template.id, template]));
     return workouts.map((workout) => ({
       id: workout.id,
       title: workout.title,
       startedAt: workout.startedAt,
+      bodyWeightKg: latestWeightAt(measurements, workout.startedAt),
       exercises: workout.exercises.map((exercise) => ({
         id: exercise.id,
         name: exercise.name,
         templateId: exercise.templateId,
         muscleGroup: exercise.muscleGroup,
+        isBodyweight: ['reps_only', 'bodyweight_weighted'].includes(
+          templatesById.get(exercise.templateId || '')?.type || '',
+        ),
         sets: exercise.sets.map((set) => ({
           weightKg: set.weightKg,
           reps: set.reps,
@@ -125,6 +137,18 @@ export class DashboardAnalyticsService {
       previousStart: new Date(currentStart.getTime() - durationMs),
     };
   }
+}
+
+function latestWeightAt(
+  measurements: Array<{ date: Date; weightKg: number | null }>,
+  workoutDate: Date,
+) {
+  for (let index = measurements.length - 1; index >= 0; index -= 1) {
+    const measurement = measurements[index];
+    if (measurement.date <= workoutDate && measurement.weightKg !== null)
+      return measurement.weightKg;
+  }
+  return null;
 }
 
 @Controller('dashboard')

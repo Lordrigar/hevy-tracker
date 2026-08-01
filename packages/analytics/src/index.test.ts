@@ -44,9 +44,115 @@ const workouts: AnalyticsWorkout[] = [
 ];
 
 describe('calculateTrainingPeriod', () => {
+  it('calculates effective bodyweight load with same-day and earlier measurements', () => {
+    const result = calculateTrainingPeriod([
+      {
+        id: 'same-day',
+        title: 'Same day',
+        startedAt: new Date('2026-07-20T18:00:00.000Z'),
+        bodyWeightKg: 75,
+        exercises: [
+          {
+            id: 'pullup-same-day',
+            templateId: 'pullup',
+            name: 'Pull Up',
+            muscleGroup: 'lats',
+            isBodyweight: true,
+            sets: [{ weightKg: 2.5, reps: 10, rpe: null }],
+          },
+        ],
+      },
+      {
+        id: 'earlier',
+        title: 'Earlier',
+        startedAt: new Date('2026-07-21'),
+        bodyWeightKg: 75,
+        exercises: [
+          {
+            id: 'pullup-earlier',
+            templateId: 'pullup',
+            name: 'Pull Up',
+            muscleGroup: 'lats',
+            isBodyweight: true,
+            sets: [{ weightKg: null, reps: 10, rpe: null }],
+          },
+        ],
+      },
+    ]);
+    expect(result.totals).toMatchObject({
+      volumeKg: 1525,
+      bodyweightCoverage: {
+        setCount: 2,
+        setsWithBodyWeight: 2,
+        setsWithoutBodyWeight: 0,
+        effectiveVolumeKg: 1525,
+        externalLoadOnlyVolumeKg: 0,
+      },
+    });
+  });
+
+  it('uses external load only, with explicit coverage, when body weight is missing', () => {
+    const result = calculateTrainingPeriod([
+      {
+        id: 'later-only',
+        title: 'Later only',
+        startedAt: new Date('2026-07-01'),
+        bodyWeightKg: null,
+        exercises: [
+          {
+            id: 'pullup-later-only',
+            templateId: 'pullup',
+            name: 'Pull Up',
+            muscleGroup: 'lats',
+            isBodyweight: true,
+            sets: [{ weightKg: 5, reps: 5, rpe: null }],
+          },
+        ],
+      },
+      {
+        id: 'unweighted',
+        title: 'Unweighted',
+        startedAt: new Date('2026-07-02'),
+        bodyWeightKg: null,
+        exercises: [
+          {
+            id: 'pullup-unweighted',
+            templateId: 'pullup',
+            name: 'Pull Up',
+            muscleGroup: 'lats',
+            isBodyweight: true,
+            sets: [{ weightKg: null, reps: 5, rpe: null }],
+          },
+        ],
+      },
+    ]);
+    expect(result.totals).toMatchObject({
+      volumeKg: 25,
+      bodyweightCoverage: {
+        setCount: 2,
+        setsWithBodyWeight: 0,
+        setsWithoutBodyWeight: 2,
+        effectiveVolumeKg: 0,
+        externalLoadOnlyVolumeKg: 25,
+      },
+    });
+  });
   it('calculates deterministic volume, set, rep, RPE, PR, and muscle-group facts', () => {
     expect(calculateTrainingPeriod(workouts)).toEqual({
-      totals: { workoutCount: 2, setCount: 5, repCount: 31, volumeKg: 1680, averageRpe: 8 },
+      totals: {
+        workoutCount: 2,
+        setCount: 5,
+        repCount: 31,
+        volumeKg: 1680,
+        averageRpe: 8,
+        bodyweightCoverage: {
+          setCount: 0,
+          setsWithBodyWeight: 0,
+          setsWithoutBodyWeight: 0,
+          effectiveVolumeKg: 0,
+          externalLoadOnlyVolumeKg: 0,
+        },
+      },
       exercises: [
         {
           exerciseKey: 'bench',
@@ -56,6 +162,13 @@ describe('calculateTrainingPeriod', () => {
           repCount: 31,
           volumeKg: 1680,
           averageRpe: 8,
+          bodyweightCoverage: {
+            setCount: 0,
+            setsWithBodyWeight: 0,
+            setsWithoutBodyWeight: 0,
+            effectiveVolumeKg: 0,
+            externalLoadOnlyVolumeKg: 0,
+          },
           maxLoadKg: 80,
           highLoadPrDates: ['2026-07-20', '2026-07-21'],
         },
@@ -67,6 +180,13 @@ describe('calculateTrainingPeriod', () => {
           repCount: 0,
           volumeKg: 0,
           averageRpe: null,
+          bodyweightCoverage: {
+            setCount: 0,
+            setsWithBodyWeight: 0,
+            setsWithoutBodyWeight: 0,
+            effectiveVolumeKg: 0,
+            externalLoadOnlyVolumeKg: 0,
+          },
           maxLoadKg: 20,
           highLoadPrDates: ['2026-07-21'],
         },
@@ -80,7 +200,20 @@ describe('calculateTrainingPeriod', () => {
 
   it('returns stable empty-period facts', () => {
     expect(calculateTrainingPeriod([])).toEqual({
-      totals: { workoutCount: 0, setCount: 0, repCount: 0, volumeKg: 0, averageRpe: null },
+      totals: {
+        workoutCount: 0,
+        setCount: 0,
+        repCount: 0,
+        volumeKg: 0,
+        averageRpe: null,
+        bodyweightCoverage: {
+          setCount: 0,
+          setsWithBodyWeight: 0,
+          setsWithoutBodyWeight: 0,
+          effectiveVolumeKg: 0,
+          externalLoadOnlyVolumeKg: 0,
+        },
+      },
       exercises: [],
       muscleGroups: [],
     });
