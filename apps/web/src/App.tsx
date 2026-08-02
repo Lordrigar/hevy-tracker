@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Box,
@@ -13,7 +13,13 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type HealthEntry, type HealthEntryInput, type MuscleGroupAnalytics } from './api';
+import {
+  api,
+  type HealthEntry,
+  type HealthEntryInput,
+  type MuscleGroupAnalytics,
+  type WorkoutHistoryItem,
+} from './api';
 
 type FormValues = Record<keyof Omit<HealthEntryInput, 'date'> | 'date', string>;
 
@@ -106,12 +112,20 @@ function changeLabel(change: number | null | undefined, unit = '') {
 type MuscleMetric = 'volumeKg' | 'repCount' | 'setCount';
 type SortDirection = 'asc' | 'desc';
 type SortState = { key: string; direction: SortDirection };
+type AppPage = 'dashboard' | 'workouts' | 'weekly-report' | 'routines';
 
 const metricLabels: Record<MuscleMetric, string> = {
   volumeKg: 'Volume (kg)',
   repCount: 'Reps',
   setCount: 'Sets',
 };
+
+function pageFromHash(): AppPage {
+  const page = window.location.hash.replace(/^#\//, '');
+  return page === 'workouts' || page === 'weekly-report' || page === 'routines'
+    ? page
+    : 'dashboard';
+}
 
 function nextSort(current: SortState, key: string): SortState {
   return {
@@ -226,6 +240,13 @@ export function App() {
     direction: 'asc',
   });
   const [prSort, setPrSort] = useState<SortState>({ key: 'exercise', direction: 'asc' });
+  const [activePage, setActivePage] = useState<AppPage>(pageFromHash);
+
+  useEffect(() => {
+    const updatePage = () => setActivePage(pageFromHash());
+    window.addEventListener('hashchange', updatePage);
+    return () => window.removeEventListener('hashchange', updatePage);
+  }, []);
 
   const statusQuery = useQuery({ queryKey: ['api-status'], queryFn: api.status });
   const healthEntriesQuery = useQuery({
@@ -320,6 +341,9 @@ export function App() {
   }
 
   const entries = healthEntriesQuery.data ?? [];
+  const workouts = (historyQuery.data ?? []).filter(
+    (item): item is WorkoutHistoryItem => typeof item.startedAt === 'string',
+  );
   const loadError =
     healthEntriesQuery.error instanceof Error ? healthEntriesQuery.error.message : undefined;
   const deleteError = deleteEntry.error instanceof Error ? deleteEntry.error.message : undefined;
@@ -406,6 +430,34 @@ export function App() {
           <Heading>Hevy Tracker</Heading>
           <Text color="fg.muted">Local training analytics — project foundation</Text>
         </Box>
+        <Stack
+          direction="row"
+          flexWrap="wrap"
+          gap="2"
+          role="navigation"
+          aria-label="Dashboard pages"
+        >
+          {(
+            [
+              ['dashboard', 'Dashboard'],
+              ['workouts', 'Workouts'],
+              ['weekly-report', 'Weekly report'],
+              ['routines', 'Routines'],
+            ] as Array<[AppPage, string]>
+          ).map(([page, label]) => (
+            <Button
+              key={page}
+              onClick={() => {
+                window.location.hash = `/${page}`;
+                setActivePage(page);
+              }}
+              size="sm"
+              variant={activePage === page ? 'solid' : 'outline'}
+            >
+              {label}
+            </Button>
+          ))}
+        </Stack>
         <Card.Root>
           <Card.Body>
             <Stack gap="3">
@@ -416,7 +468,44 @@ export function App() {
             </Stack>
           </Card.Body>
         </Card.Root>
-        <Card.Root>
+        <Card.Root display={activePage === 'workouts' ? undefined : 'none'}>
+          <Card.Header>
+            <Heading size="md">Workout history</Heading>
+          </Card.Header>
+          <Card.Body overflowX="auto">
+            {historyQuery.isPending ? (
+              <Text color="fg.muted">Loading workout history…</Text>
+            ) : historyQuery.isError ? (
+              <Text color="red.fg">Unable to load workout history.</Text>
+            ) : workouts.length ? (
+              <Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Date</Table.ColumnHeader>
+                    <Table.ColumnHeader>Workout</Table.ColumnHeader>
+                    <Table.ColumnHeader>Exercises</Table.ColumnHeader>
+                    <Table.ColumnHeader>Sets</Table.ColumnHeader>
+                    <Table.ColumnHeader>Volume</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {workouts.map((workout) => (
+                    <Table.Row key={workout.id}>
+                      <Table.Cell>{workout.startedAt.slice(0, 10)}</Table.Cell>
+                      <Table.Cell>{workout.title}</Table.Cell>
+                      <Table.Cell>{workout.exerciseCount}</Table.Cell>
+                      <Table.Cell>{workout.setCount}</Table.Cell>
+                      <Table.Cell>{formatNumber(workout.volumeKg)} kg</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            ) : (
+              <Text color="fg.muted">No imported workouts in this range.</Text>
+            )}
+          </Card.Body>
+        </Card.Root>
+        <Card.Root display={activePage === 'dashboard' ? undefined : 'none'}>
           <Card.Header>
             <Stack direction={{ base: 'column', md: 'row' }} justify="space-between">
               <Box>
@@ -665,7 +754,7 @@ export function App() {
                     <Text>Loading workout history…</Text>
                   ) : historyQuery.isError ? (
                     <Text color="red.fg">Unable to load workout history.</Text>
-                  ) : historyQuery.data?.length ? (
+                  ) : workouts.length ? (
                     <Table.Root size="sm">
                       <Table.Header>
                         <Table.Row>
@@ -677,7 +766,7 @@ export function App() {
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
-                        {historyQuery.data.map((workout) => (
+                        {workouts.map((workout) => (
                           <Table.Row key={workout.id}>
                             <Table.Cell>{workout.startedAt.slice(0, 10)}</Table.Cell>
                             <Table.Cell>{workout.title}</Table.Cell>
@@ -724,13 +813,8 @@ export function App() {
               <Text color="red.fg">Unable to load training analytics.</Text>
             )}
           </Card.Body>
-          <Card.Footer>
-            <Button variant="outline" onClick={() => setAnalysisDialogOpen(true)}>
-              Prepare weekly analysis
-            </Button>
-          </Card.Footer>
         </Card.Root>
-        <Card.Root>
+        <Card.Root display={activePage === 'weekly-report' ? undefined : 'none'}>
           <Card.Header>
             <Heading size="md">Weekly report</Heading>
           </Card.Header>
@@ -967,8 +1051,13 @@ export function App() {
               <Text color="fg.muted">No weekly report has been generated yet.</Text>
             )}
           </Card.Body>
+          <Card.Footer>
+            <Button variant="outline" onClick={() => setAnalysisDialogOpen(true)}>
+              Prepare weekly analysis
+            </Button>
+          </Card.Footer>
         </Card.Root>
-        <Card.Root>
+        <Card.Root display={activePage === 'workouts' ? undefined : 'none'}>
           <Card.Header>
             <Heading size="md">Hevy data</Heading>
           </Card.Header>
@@ -1020,7 +1109,7 @@ export function App() {
             </Stack>
           </Card.Body>
         </Card.Root>
-        <Card.Root>
+        <Card.Root display={activePage === 'dashboard' ? undefined : 'none'}>
           <Card.Header>
             <Stack direction={{ base: 'column', sm: 'row' }} justify="space-between">
               <Box>
@@ -1080,6 +1169,17 @@ export function App() {
                 </Table.Body>
               </Table.Root>
             )}
+          </Card.Body>
+        </Card.Root>
+        <Card.Root display={activePage === 'routines' ? undefined : 'none'}>
+          <Card.Header>
+            <Heading size="md">Routines</Heading>
+          </Card.Header>
+          <Card.Body>
+            <Text color="fg.muted">
+              Routine import and deterministic routine facts will appear here after the explicit
+              routine-sync action is added in task 009a.
+            </Text>
           </Card.Body>
         </Card.Root>
       </Stack>

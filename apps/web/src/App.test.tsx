@@ -89,6 +89,7 @@ function renderApp() {
 
 describe('App', () => {
   beforeEach(() => {
+    window.location.hash = '#/dashboard';
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
@@ -103,6 +104,7 @@ describe('App', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    window.location.hash = '';
   });
 
   it('opens the health-entry modal from the empty history state', async () => {
@@ -117,6 +119,20 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Add daily entry' }));
     expect(screen.getByLabelText('Steps')).toBeInTheDocument();
     expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
+  });
+
+  it('navigates between hash-addressable dashboard pages', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    expect(await screen.findByRole('heading', { name: 'Training dashboard' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Weekly report' }));
+    expect(await screen.findByRole('heading', { name: 'Weekly report' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Training dashboard' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Routines' }));
+    expect(await screen.findByRole('heading', { name: 'Routines' })).toBeVisible();
+    expect(window.location.hash).toBe('#/routines');
   });
 
   it('opens a populated health-entry modal for editing', async () => {
@@ -184,6 +200,7 @@ describe('App', () => {
     const user = userEvent.setup();
     renderApp();
 
+    await user.click(screen.getByRole('button', { name: 'Workouts' }));
     await screen.findByText('No Hevy import has been run yet.');
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/hevy/sync'))).toBe(false);
 
@@ -234,6 +251,7 @@ describe('App', () => {
     const user = userEvent.setup();
     renderApp();
 
+    await user.click(screen.getByRole('button', { name: 'Weekly report' }));
     expect(await screen.findByText('No weekly report has been generated yet.')).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(

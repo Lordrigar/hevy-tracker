@@ -29,9 +29,10 @@ Tasks live in [`tasks/`](tasks/). Complete only one task at a time: implement it
 9. [008 — Dashboard visualisations](tasks/008-dashboard.md)
 10. [009 — Weekly report workflow](tasks/009-weekly-report.md)
 11. [009a — Hevy routine sync and critique context](tasks/009a-routine-sync.md)
-12. [010 — Local MCP server and dashboard resource](tasks/010-mcp-server.md)
-13. [011 — Codex skills and workflows](tasks/011-agent-assets.md)
-14. [012 — Test fixtures, end-to-end checks, and handoff](tasks/012-quality-handoff.md)
+12. [009b — Historical weekly and monthly reports](tasks/009b-historical-reports.md)
+13. [010 — Local MCP server and dashboard resource](tasks/010-mcp-server.md)
+14. [011 — Codex skills and workflows](tasks/011-agent-assets.md)
+15. [012 — Test fixtures, end-to-end checks, and handoff](tasks/012-quality-handoff.md)
 
 ## Core interfaces
 
@@ -39,6 +40,7 @@ Tasks live in [`tasks/`](tasks/). Complete only one task at a time: implement it
 - `POST /api/hevy/sync`, `GET /api/hevy/status` for explicitly user-triggered local imports only.
 - `POST /api/hevy/sync-routines`, `GET /api/routines`, and `GET /api/routines/:id` for explicitly user-triggered, read-only Hevy routine imports and local deterministic routine facts.
 - `GET /api/dashboard/overview`, `GET /api/dashboard/exercise-trend`, and `GET /api/dashboard/weekly-report` for computed views.
+- `POST /api/dashboard/reports/generate`, `GET /api/dashboard/reports`, and `GET /api/dashboard/reports/:periodKey` for explicitly generated historical weekly and monthly reports.
 - MCP tools mirror read-only analytics endpoints and expose a clearly named sync action only on explicit user request. The dashboard exposes a separate manual action that prepares the current weekly facts for a ChatGPT conversation; it never calls a model itself.
 
 ## V1 reporting
