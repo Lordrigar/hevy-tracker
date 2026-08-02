@@ -200,7 +200,14 @@ describe('App', () => {
       generatedAt: '2026-07-27T10:00:00.000Z',
       totals: { workoutCount: 2, setCount: 6, repCount: 48, volumeKg: 1200, averageRpe: 8 },
       changes: { workoutCount: 1, setCount: 2, repCount: 12, volumeKg: 400 },
-      prs: [],
+      prs: [
+        {
+          exerciseKey: 'bench',
+          exerciseName: 'Bench Press',
+          maxLoadKg: 80,
+          achievedOn: ['2026-07-26'],
+        },
+      ],
       strengthChanges: [
         {
           exerciseKey: 'bench',
@@ -240,9 +247,18 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Generate weekly report' }));
 
     expect(await screen.findByRole('columnheader', { name: 'Current best' })).toBeInTheDocument();
-    expect(screen.getByText('Bench Press')).toBeInTheDocument();
+    expect(screen.getAllByText('Bench Press')).toHaveLength(2);
     expect(screen.getByText('+5 kg')).toBeInTheDocument();
     expect(screen.getByLabelText('chest current week: 900 kg')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Sort strength changes by Current best ascending' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Sort strength changes by Current best descending' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sort personal bests by Best load ascending' }),
+    ).toBeInTheDocument();
   });
 
   it('supports range presets, ranked muscle details, autocomplete, and imported measurements', async () => {

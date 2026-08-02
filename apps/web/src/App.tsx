@@ -104,12 +104,61 @@ function changeLabel(change: number | null | undefined, unit = '') {
 }
 
 type MuscleMetric = 'volumeKg' | 'repCount' | 'setCount';
+type SortDirection = 'asc' | 'desc';
+type SortState = { key: string; direction: SortDirection };
 
 const metricLabels: Record<MuscleMetric, string> = {
   volumeKg: 'Volume (kg)',
   repCount: 'Reps',
   setCount: 'Sets',
 };
+
+function nextSort(current: SortState, key: string): SortState {
+  return {
+    key,
+    direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+  };
+}
+
+function compareText(left: string, right: string, direction: SortDirection) {
+  return left.localeCompare(right) * (direction === 'asc' ? 1 : -1);
+}
+
+function compareNumber(left: number | null, right: number | null, direction: SortDirection) {
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return (left - right) * (direction === 'asc' ? 1 : -1);
+}
+
+function SortHeader({
+  table,
+  label,
+  column,
+  sort,
+  onSort,
+}: {
+  table: string;
+  label: string;
+  column: string;
+  sort: SortState;
+  onSort: (column: string) => void;
+}) {
+  const active = sort.key === column;
+  const nextDirection = active && sort.direction === 'asc' ? 'descending' : 'ascending';
+  return (
+    <Button
+      aria-label={`Sort ${table} by ${label} ${nextDirection}`}
+      onClick={() => onSort(column)}
+      size="xs"
+      variant="ghost"
+    >
+      {label}{' '}
+      <Box as="span" aria-hidden="true">
+        {active ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}
+      </Box>
+    </Button>
+  );
+}
 
 function MuscleGroupBars({
   groups,
@@ -172,6 +221,11 @@ export function App() {
   const [exercise, setExercise] = useState('');
   const [muscleMetric, setMuscleMetric] = useState<MuscleMetric>('volumeKg');
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<string>();
+  const [strengthSort, setStrengthSort] = useState<SortState>({
+    key: 'exercise',
+    direction: 'asc',
+  });
+  const [prSort, setPrSort] = useState<SortState>({ key: 'exercise', direction: 'asc' });
 
   const statusQuery = useQuery({ queryKey: ['api-status'], queryFn: api.status });
   const healthEntriesQuery = useQuery({
@@ -282,6 +336,42 @@ export function App() {
       group.previousVolumeKg,
     ]) ?? []),
     1,
+  );
+  const sortedStrengthChanges = useMemo(
+    () =>
+      [...(weeklyReport?.strengthChanges ?? [])].sort((left, right) => {
+        if (strengthSort.key === 'current')
+          return compareNumber(
+            left.currentMaxLoadKg,
+            right.currentMaxLoadKg,
+            strengthSort.direction,
+          );
+        if (strengthSort.key === 'previous')
+          return compareNumber(
+            left.previousMaxLoadKg,
+            right.previousMaxLoadKg,
+            strengthSort.direction,
+          );
+        if (strengthSort.key === 'change')
+          return compareNumber(left.changeKg, right.changeKg, strengthSort.direction);
+        return compareText(left.exerciseName, right.exerciseName, strengthSort.direction);
+      }),
+    [strengthSort, weeklyReport],
+  );
+  const sortedPrs = useMemo(
+    () =>
+      [...(weeklyReport?.prs ?? [])].sort((left, right) => {
+        if (prSort.key === 'load')
+          return compareNumber(left.maxLoadKg, right.maxLoadKg, prSort.direction);
+        if (prSort.key === 'achieved')
+          return compareText(
+            left.achievedOn.join(', '),
+            right.achievedOn.join(', '),
+            prSort.direction,
+          );
+        return compareText(left.exerciseName, right.exerciseName, prSort.direction);
+      }),
+    [prSort, weeklyReport],
   );
   const directMuscleExercises = useMemo(
     () =>
@@ -694,14 +784,46 @@ export function App() {
                       <Table.Root size="sm">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Exercise</Table.ColumnHeader>
-                            <Table.ColumnHeader>Current best</Table.ColumnHeader>
-                            <Table.ColumnHeader>Previous</Table.ColumnHeader>
-                            <Table.ColumnHeader>Change</Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="strength changes"
+                                label="Exercise"
+                                column="exercise"
+                                sort={strengthSort}
+                                onSort={(key) => setStrengthSort(nextSort(strengthSort, key))}
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="strength changes"
+                                label="Current best"
+                                column="current"
+                                sort={strengthSort}
+                                onSort={(key) => setStrengthSort(nextSort(strengthSort, key))}
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="strength changes"
+                                label="Previous"
+                                column="previous"
+                                sort={strengthSort}
+                                onSort={(key) => setStrengthSort(nextSort(strengthSort, key))}
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="strength changes"
+                                label="Change"
+                                column="change"
+                                sort={strengthSort}
+                                onSort={(key) => setStrengthSort(nextSort(strengthSort, key))}
+                              />
+                            </Table.ColumnHeader>
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
-                          {weeklyReport.strengthChanges.map((change) => (
+                          {sortedStrengthChanges.map((change) => (
                             <Table.Row key={change.exerciseKey}>
                               <Table.Cell>{change.exerciseName}</Table.Cell>
                               <Table.Cell>{formatNumber(change.currentMaxLoadKg)} kg</Table.Cell>
@@ -739,13 +861,37 @@ export function App() {
                       <Table.Root size="sm">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Exercise</Table.ColumnHeader>
-                            <Table.ColumnHeader>Best load</Table.ColumnHeader>
-                            <Table.ColumnHeader>Achieved</Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="personal bests"
+                                label="Exercise"
+                                column="exercise"
+                                sort={prSort}
+                                onSort={(key) => setPrSort(nextSort(prSort, key))}
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="personal bests"
+                                label="Best load"
+                                column="load"
+                                sort={prSort}
+                                onSort={(key) => setPrSort(nextSort(prSort, key))}
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>
+                              <SortHeader
+                                table="personal bests"
+                                label="Achieved"
+                                column="achieved"
+                                sort={prSort}
+                                onSort={(key) => setPrSort(nextSort(prSort, key))}
+                              />
+                            </Table.ColumnHeader>
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
-                          {weeklyReport.prs.map((pr) => (
+                          {sortedPrs.map((pr) => (
                             <Table.Row key={pr.exerciseKey}>
                               <Table.Cell>{pr.exerciseName}</Table.Cell>
                               <Table.Cell>{formatNumber(pr.maxLoadKg)} kg</Table.Cell>
