@@ -59,4 +59,33 @@ describe('RoutineService persistence mapping', () => {
       }),
     );
   });
+
+  it('reverses the list response position when a routine-detail response omits it', async () => {
+    const upsert = vi.fn();
+    const service = new RoutineService(
+      { $transaction: vi.fn(async (callback) => callback({ routine: { upsert } })) } as never,
+      {
+        listRoutines: vi.fn().mockResolvedValue([
+          { id: 'routine-1', folder_id: 12 },
+          { id: 'routine-2', folder_id: 12 },
+        ]),
+        listRoutineFolders: vi.fn().mockResolvedValue([{ id: 12, title: 'ULUL' }]),
+        getRoutine: vi
+          .fn()
+          .mockResolvedValueOnce({ id: 'routine-1', title: 'Upper A' })
+          .mockResolvedValueOnce({ id: 'routine-2', title: 'Lower A' }),
+      } as never,
+    );
+
+    await service.sync();
+
+    expect(upsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ create: expect.objectContaining({ ordinal: 2, folderId: '12' }) }),
+    );
+    expect(upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ create: expect.objectContaining({ ordinal: 1, folderId: '12' }) }),
+    );
+  });
 });

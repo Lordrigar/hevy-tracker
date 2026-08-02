@@ -42,7 +42,17 @@ export class RoutineService {
         folders.map((folder) => [String(folder.id), folder.title || folder.name || null]),
       );
       const routines = await Promise.all(
-        summaries.map((routine) => this.hevy.getRoutine(routine.id)),
+        summaries.map(async (summary, listPosition) => {
+          const detail = await this.hevy.getRoutine(summary.id);
+          return {
+            ...detail,
+            // Hevy returns the paginated routine list in reverse app order
+            // when no explicit routine index is present.
+            index: summary.index ?? detail.index ?? summaries.length - listPosition,
+            folder_id: summary.folder_id ?? detail.folder_id,
+            title: detail.title ?? summary.title,
+          };
+        }),
       );
       this.logger.log(
         `Routine sync retrieved ${routines.length} routine details; storing locally.`,
