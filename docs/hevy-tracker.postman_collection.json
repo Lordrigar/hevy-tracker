@@ -290,6 +290,81 @@
               }
             }
           ]
+        },
+        {
+          "name": "Sync Hevy routines (manual trigger)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hevy/sync-routines",
+              "host": ["{{baseUrl}}"],
+              "path": ["hevy", "sync-routines"]
+            },
+            "description": "Explicitly imports routines through read-only Hevy GET endpoints. It never creates, updates, or deletes a Hevy routine."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns routine import facts', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('succeeded'); });",
+                  "pm.test('does not return a secret', function () { pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List stored routines",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/routines", "host": ["{{baseUrl}}"], "path": ["routines"] },
+            "description": "Reads locally imported routine facts only; it never contacts Hevy."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns an array of deterministic facts', function () { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get stored routine",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/routines/{{routineId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["routines", "{{routineId}}"]
+            },
+            "description": "Reads one locally imported normalized routine and its deterministic facts."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns a routine without a secret', function () { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.have.property('facts'); pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

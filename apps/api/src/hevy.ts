@@ -55,6 +55,37 @@ export type HevyBodyMeasurement = {
 export type HevyWorkoutEvent =
   { type: 'updated'; workout: HevyWorkout } | { type: 'deleted'; id: string; deleted_at?: string };
 
+export type HevyRoutineSet = {
+  type?: string | null;
+  weight_kg?: number | null;
+  reps?: number | null;
+  rpe?: number | null;
+};
+
+export type HevyRoutineExercise = {
+  exercise_template_id?: string | null;
+  title?: string | null;
+  superset_id?: string | null;
+  rest_seconds?: number | null;
+  notes?: string | null;
+  sets?: HevyRoutineSet[];
+};
+
+export type HevyRoutine = {
+  id: string;
+  index?: number | null;
+  title?: string | null;
+  folder_id?: string | number | null;
+  notes?: string | null;
+  exercises?: HevyRoutineExercise[];
+};
+
+export type HevyRoutineFolder = {
+  id: string | number;
+  title?: string | null;
+  name?: string | null;
+};
+
 type PaginatedResponse<T, K extends string> = {
   page: number;
   page_count: number;
@@ -87,6 +118,41 @@ export class HevyClient {
       '/body_measurements',
       'body_measurements',
     );
+  }
+
+  async listRoutines() {
+    return this.listAll<HevyRoutine, 'routines'>('/routines', 'routines');
+  }
+
+  async listRoutineFolders() {
+    return this.listAll<HevyRoutineFolder, 'routine_folders'>(
+      '/routine_folders',
+      'routine_folders',
+    );
+  }
+
+  async getRoutine(id: string): Promise<HevyRoutine> {
+    const apiKey = process.env.HEVY_API_KEY;
+    if (!apiKey)
+      throw new HevyApiError('HEVY_API_KEY is not configured. Add it to your local environment.');
+    const response = await fetch(new URL(`${this.baseUrl}/routines/${encodeURIComponent(id)}`), {
+      method: 'GET',
+      headers: { 'api-key': apiKey },
+    });
+    const body: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) throw new HevyApiError(this.messageFor(response.status));
+    const routine =
+      body && typeof body === 'object' && 'routine' in body
+        ? (body as { routine: unknown }).routine
+        : body;
+    if (
+      !routine ||
+      typeof routine !== 'object' ||
+      typeof (routine as { id?: unknown }).id !== 'string'
+    ) {
+      throw new HevyApiError('Hevy returned an unexpected response. Please try again later.');
+    }
+    return routine as HevyRoutine;
   }
 
   async listWorkoutEvents(since: Date) {

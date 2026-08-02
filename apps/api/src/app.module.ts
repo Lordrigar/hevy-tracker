@@ -3,9 +3,23 @@ import { DashboardAnalyticsController, DashboardAnalyticsService } from './dashb
 import { HealthController, HealthService } from './health';
 import { HevyClient, HevyController, HevySyncService } from './hevy';
 import { PrismaService } from './prisma.service';
+import { RoutineService, RoutinesController, RoutineSyncController } from './routines';
 
 @Module({
-  controllers: [HealthController, HevyController, DashboardAnalyticsController],
-  providers: [PrismaService, HealthService, HevyClient, HevySyncService, DashboardAnalyticsService],
+  controllers: [
+    HealthController,
+    HevyController,
+    DashboardAnalyticsController,
+    RoutineSyncController,
+    RoutinesController,
+  ],
+  providers: [
+    PrismaService,
+    HealthService,
+    HevyClient,
+    HevySyncService,
+    DashboardAnalyticsService,
+    RoutineService,
+  ],
 })
 export class AppModule {}

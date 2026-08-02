@@ -85,6 +85,32 @@ describe('HevyClient', () => {
     vi.unstubAllGlobals();
     delete process.env.HEVY_API_KEY;
   });
+
+  it('imports routines and folders exclusively through documented GET endpoints', async () => {
+    process.env.HEVY_API_KEY = 'sanitized-test-key';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response({ page: 1, page_count: 1, routines: [{ id: 'routine-1' }] }))
+      .mockResolvedValueOnce(response({ page: 1, page_count: 1, routine_folders: [] }))
+      .mockResolvedValueOnce(response({ routine: { id: 'routine-1', title: 'Fixture routine' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new HevyClient();
+
+    await expect(client.listRoutines()).resolves.toEqual([{ id: 'routine-1' }]);
+    await expect(client.listRoutineFolders()).resolves.toEqual([]);
+    await expect(client.getRoutine('routine-1')).resolves.toMatchObject({
+      title: 'Fixture routine',
+    });
+
+    expect(fetchMock.mock.calls.map(([, init]) => (init as RequestInit).method)).toEqual([
+      'GET',
+      'GET',
+      'GET',
+    ]);
+    expect(fetchMock.mock.calls[2][0].toString()).toContain('/routines/routine-1');
+    vi.unstubAllGlobals();
+    delete process.env.HEVY_API_KEY;
+  });
 });
 
 describe('HevySyncService mapping', () => {

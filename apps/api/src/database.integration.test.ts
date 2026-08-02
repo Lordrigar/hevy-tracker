@@ -27,6 +27,9 @@ describe('Task 2 database schema', () => {
       'SyncState',
       'SyncLog',
       'WeeklyReport',
+      'Routine',
+      'RoutineExercise',
+      'RoutineSet',
     ]) {
       expect(tables).toContain(table);
     }
@@ -52,5 +55,48 @@ describe('Task 2 database schema', () => {
 
     await prisma.workout.delete({ where: { id: workout.id } });
     await expect(prisma.workoutSet.count({ where: { id: setId } })).resolves.toBe(0);
+  });
+});
+
+describe('Task 009a routine persistence', () => {
+  const routineId = 'task-009a-fixture-routine';
+
+  beforeAll(async () => {
+    await prisma.$connect();
+    await prisma.routine.deleteMany({ where: { id: routineId } });
+  });
+
+  afterAll(async () => {
+    await prisma.routine.deleteMany({ where: { id: routineId } });
+    await prisma.$disconnect();
+  });
+
+  it('upserts a normalized routine and replaces nested planned exercises without duplication', async () => {
+    const data = {
+      title: 'Fixture routine',
+      raw: { id: routineId },
+      exercises: {
+        create: {
+          name: 'Fixture Bench Press',
+          ordinal: 0,
+          raw: { title: 'Fixture Bench Press' },
+          sets: { create: { ordinal: 0, reps: 8, weightKg: 80 } },
+        },
+      },
+    };
+    for (const title of ['Fixture routine', 'Updated fixture routine']) {
+      await prisma.routine.upsert({
+        where: { id: routineId },
+        create: { id: routineId, ...data, title },
+        update: { title, exercises: { deleteMany: {}, create: data.exercises.create } },
+      });
+    }
+    const routine = await prisma.routine.findUnique({
+      where: { id: routineId },
+      include: { exercises: { include: { sets: true } } },
+    });
+    expect(routine).toMatchObject({ title: 'Updated fixture routine' });
+    expect(routine?.exercises).toHaveLength(1);
+    expect(routine?.exercises[0].sets).toHaveLength(1);
   });
 });

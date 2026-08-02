@@ -18,6 +18,8 @@ import {
   type HealthEntry,
   type HealthEntryInput,
   type MuscleGroupAnalytics,
+  type Routine,
+  type RoutineDetail,
   type WorkoutHistoryItem,
 } from './api';
 
@@ -69,6 +71,103 @@ function toInput(values: FormValues): HealthEntryInput {
     if (value !== '') entry[field.key] = Number(value) as never;
   }
   return entry;
+}
+
+function RoutineTable({
+  onSelect,
+  routines,
+}: {
+  onSelect: (id: string) => void;
+  routines: Routine[];
+}) {
+  return (
+    <Table.Root size="sm" variant="outline">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Routine</Table.ColumnHeader>
+          <Table.ColumnHeader>Planned exercises</Table.ColumnHeader>
+          <Table.ColumnHeader>Direct / indirect sets</Table.ColumnHeader>
+          <Table.ColumnHeader>Data checks</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {routines.map((routine) => (
+          <Table.Row
+            aria-label={`Open ${routine.title}`}
+            cursor="pointer"
+            key={routine.id}
+            onClick={() => onSelect(routine.id)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') onSelect(routine.id);
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <Table.Cell>{routine.title}</Table.Cell>
+            <Table.Cell>{routine.facts.plannedExerciseCount}</Table.Cell>
+            <Table.Cell>
+              {routine.facts.muscleGroups.length ? (
+                <Stack gap="1">
+                  {routine.facts.muscleGroups.map((group) => (
+                    <Text key={group.muscleGroup}>
+                      {group.muscleGroup}: {group.directSets} direct · {group.indirectSets} indirect
+                    </Text>
+                  ))}
+                </Stack>
+              ) : (
+                '—'
+              )}
+            </Table.Cell>
+            <Table.Cell>
+              {routine.facts.duplicateExercises.length
+                ? `Duplicates: ${routine.facts.duplicateExercises.join(', ')}`
+                : ''}
+              {routine.facts.unknownTemplateExercises.length
+                ? `${routine.facts.duplicateExercises.length ? ' · ' : ''}Unknown: ${routine.facts.unknownTemplateExercises.join(', ')}`
+                : ''}{' '}
+              {!routine.facts.duplicateExercises.length &&
+              !routine.facts.unknownTemplateExercises.length
+                ? 'None'
+                : ''}
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </Table.Root>
+  );
+}
+
+function RoutineDetailContent({ routine }: { routine: RoutineDetail }) {
+  return (
+    <Stack gap="5">
+      {routine.notes && <Text whiteSpace="pre-wrap">{routine.notes}</Text>}
+      {routine.exercises.map((exercise) => (
+        <Card.Root key={exercise.id} size="sm" variant="outline">
+          <Card.Header>
+            <Heading size="sm">
+              {exercise.ordinal + 1}. {exercise.name}
+            </Heading>
+          </Card.Header>
+          <Card.Body>
+            <Stack gap="3">
+              {exercise.notes && <Text whiteSpace="pre-wrap">{exercise.notes}</Text>}
+              {exercise.restSeconds !== null && (
+                <Text color="fg.muted">Rest: {exercise.restSeconds}s</Text>
+              )}
+              <Stack gap="1">
+                {exercise.sets.map((set) => (
+                  <Text key={set.id}>
+                    Set {set.ordinal + 1} · {set.type || 'normal'} · {set.weightKg ?? '—'} kg ×{' '}
+                    {set.reps ?? '—'} reps{set.rpe !== null ? ` · RPE ${set.rpe}` : ''}
+                  </Text>
+                ))}
+              </Stack>
+            </Stack>
+          </Card.Body>
+        </Card.Root>
+      ))}
+    </Stack>
+  );
 }
 
 function dateOffset(days: number) {
@@ -241,6 +340,7 @@ export function App() {
   });
   const [prSort, setPrSort] = useState<SortState>({ key: 'exercise', direction: 'asc' });
   const [activePage, setActivePage] = useState<AppPage>(pageFromHash);
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
 
   useEffect(() => {
     const updatePage = () => setActivePage(pageFromHash());
@@ -304,6 +404,24 @@ export function App() {
       setAnalysisDialogOpen(false);
     },
   });
+  const routinesQuery = useQuery({ queryKey: ['routines'], queryFn: api.routines });
+  const routineQuery = useQuery({
+    queryKey: ['routine', selectedRoutineId],
+    queryFn: () => api.routine(selectedRoutineId!),
+    enabled: selectedRoutineId !== null,
+  });
+  const syncRoutines = useMutation({
+    mutationFn: api.syncRoutines,
+    onSuccess: () => routinesQuery.refetch(),
+  });
+  const routines = (routinesQuery.data ?? []).filter((routine) => routine.facts !== undefined);
+  const routineFolders = [
+    ...routines.reduce((folders, routine) => {
+      const folder = routine.folder || 'Unfiled';
+      folders.set(folder, [...(folders.get(folder) || []), routine]);
+      return folders;
+    }, new Map<string, Routine[]>()),
+  ].sort(([left], [right]) => left.localeCompare(right));
 
   const state = statusQuery.isPending
     ? 'checking'
@@ -1173,15 +1291,63 @@ export function App() {
         </Card.Root>
         <Card.Root display={activePage === 'routines' ? undefined : 'none'}>
           <Card.Header>
-            <Heading size="md">Routines</Heading>
+            <Stack direction={{ base: 'column', sm: 'row' }} justify="space-between">
+              <Heading size="md">Routines</Heading>
+              <Button loading={syncRoutines.isPending} onClick={() => syncRoutines.mutate()}>
+                Sync Hevy routines
+              </Button>
+            </Stack>
           </Card.Header>
           <Card.Body>
-            <Text color="fg.muted">
-              Routine import and deterministic routine facts will appear here after the explicit
-              routine-sync action is added in task 009a.
-            </Text>
+            <Stack gap="4">
+              <Text color="fg.muted">
+                Routine sync is manual and read-only. It never changes a routine in Hevy or
+                generates a report.
+              </Text>
+              {syncRoutines.isError && <Text color="fg.error">{syncRoutines.error.message}</Text>}
+              {syncRoutines.data && <Text color="fg.muted">{syncRoutines.data.message}</Text>}
+              {routinesQuery.isLoading ? (
+                <Text>Loading routines…</Text>
+              ) : routines.length ? (
+                <Stack gap="6">
+                  {routineFolders.map(([folder, folderRoutines]) => (
+                    <Stack gap="2" key={folder}>
+                      <Heading size="sm">{folder}</Heading>
+                      <RoutineTable onSelect={setSelectedRoutineId} routines={folderRoutines} />
+                    </Stack>
+                  ))}
+                </Stack>
+              ) : (
+                <Text color="fg.muted">No routines imported yet.</Text>
+              )}
+            </Stack>
           </Card.Body>
         </Card.Root>
+        <Dialog.Root
+          open={selectedRoutineId !== null}
+          onOpenChange={(details) => {
+            if (!details.open) setSelectedRoutineId(null);
+          }}
+        >
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="4xl">
+              <Dialog.Header>
+                <Dialog.Title>{routineQuery.data?.title || 'Routine details'}</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                {routineQuery.isLoading && <Text>Loading routine…</Text>}
+                {routineQuery.isError && <Text color="fg.error">{routineQuery.error.message}</Text>}
+                {routineQuery.data && <RoutineDetailContent routine={routineQuery.data} />}
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
+                  <Button variant="outline">Close</Button>
+                </Dialog.ActionTrigger>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Dialog.Root>
       </Stack>
 
       <Dialog.Root

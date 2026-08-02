@@ -113,3 +113,47 @@ model WeeklyReport {
 
   @@index([weekStart])
 }
+
+model Routine {
+  id        String            @id
+  title     String
+  ordinal   Int               @default(0)
+  folderId  String?
+  folder    String?
+  notes     String?
+  raw       Json
+  exercises RoutineExercise[]
+  updatedAt DateTime          @updatedAt
+
+  @@index([folderId])
+}
+
+model RoutineExercise {
+  id          String       @id @default(cuid())
+  routineId   String
+  templateId  String?
+  name        String
+  ordinal     Int
+  supersetId  String?
+  restSeconds Int?
+  notes       String?
+  raw         Json
+  routine     Routine      @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  sets        RoutineSet[]
+
+  @@unique([routineId, ordinal])
+  @@index([templateId])
+}
+
+model RoutineSet {
+  id                String          @id @default(cuid())
+  routineExerciseId String
+  ordinal           Int
+  type              String?
+  weightKg          Float?
+  reps              Int?
+  rpe               Float?
+  routineExercise   RoutineExercise @relation(fields: [routineExerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([routineExerciseId, ordinal])
+}

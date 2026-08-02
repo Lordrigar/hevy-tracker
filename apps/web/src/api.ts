@@ -42,6 +42,34 @@ export type HevySyncResult = {
   syncedAt: string;
 };
 
+export type RoutineFacts = {
+  plannedExerciseCount: number;
+  muscleGroups: Array<{ muscleGroup: string; directSets: number; indirectSets: number }>;
+  duplicateExercises: string[];
+  unknownTemplateExercises: string[];
+};
+
+export type Routine = { id: string; title: string; folder: string | null; facts: RoutineFacts };
+
+export type RoutineDetail = Routine & {
+  notes: string | null;
+  exercises: Array<{
+    id: string;
+    name: string;
+    ordinal: number;
+    restSeconds: number | null;
+    notes: string | null;
+    sets: Array<{
+      id: string;
+      ordinal: number;
+      type: string | null;
+      weightKg: number | null;
+      reps: number | null;
+      rpe: number | null;
+    }>;
+  }>;
+};
+
 export type TrainingTotals = {
   workoutCount: number;
   setCount: number;
@@ -167,6 +195,12 @@ export const api = {
     request<{ success: boolean }>(`/health/${id}`, { method: 'DELETE' }),
   hevyStatus: () => request<HevySyncStatus>('/hevy/status'),
   syncHevy: () => request<HevySyncResult>('/hevy/sync', { method: 'POST' }),
+  syncRoutines: () =>
+    request<{ status: 'succeeded'; imported: number; message: string }>('/hevy/sync-routines', {
+      method: 'POST',
+    }),
+  routines: () => request<Routine[]>('/routines'),
+  routine: (id: string) => request<RoutineDetail>(`/routines/${encodeURIComponent(id)}`),
   dashboardOverview: (from: string, to: string) =>
     request<DashboardOverview>(`/dashboard/overview?from=${from}&to=${to}`),
   workoutHistory: (from: string, to: string) =>
