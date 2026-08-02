@@ -71,6 +71,12 @@ function dateOffset(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function dateBefore(dateString: string, days: number) {
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
 function dateStartOfYear() {
   return `${new Date().getFullYear()}-01-01`;
 }
@@ -190,6 +196,10 @@ export function App() {
     queryFn: () => api.exerciseTrend(from, to, exercise),
     enabled: exercise.trim().length > 0,
   });
+  const weeklyReportQuery = useQuery({
+    queryKey: ['weekly-report'],
+    queryFn: api.weeklyReport,
+  });
   const saveEntry = useMutation({
     mutationFn: api.saveHealthEntry,
     onSuccess: async () => {
@@ -210,6 +220,13 @@ export function App() {
     mutationFn: api.syncHevy,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['hevy-status'] });
+    },
+  });
+  const generateWeeklyReport = useMutation({
+    mutationFn: () => api.generateWeeklyReport(dateBefore(to, 6)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['weekly-report'] });
+      setAnalysisDialogOpen(false);
     },
   });
 
@@ -258,13 +275,32 @@ export function App() {
     [entries, from, to],
   );
   const overview = overviewQuery.data?.current ? overviewQuery.data : undefined;
-  const selectedMuscleExercises = useMemo(
+  const weeklyReport = weeklyReportQuery.data?.totals ? weeklyReportQuery.data : undefined;
+  const maximumWeeklyMuscleVolume = Math.max(
+    ...(weeklyReport?.muscleGroupVolumeDeltas.flatMap((group) => [
+      group.currentVolumeKg,
+      group.previousVolumeKg,
+    ]) ?? []),
+    1,
+  );
+  const directMuscleExercises = useMemo(
     () =>
-      overview?.current.exercises.filter(
-        (item) =>
-          item.muscleGroup === selectedMuscleGroup ||
-          (item.secondaryMuscleGroups ?? []).includes(selectedMuscleGroup ?? ''),
-      ) ?? [],
+      overview?.current.exercises
+        .filter((item) => item.muscleGroup === selectedMuscleGroup)
+        .sort(
+          (left, right) =>
+            right.volumeKg - left.volumeKg || left.exerciseName.localeCompare(right.exerciseName),
+        ) ?? [],
+    [overview, selectedMuscleGroup],
+  );
+  const indirectMuscleExercises = useMemo(
+    () =>
+      overview?.current.exercises
+        .filter((item) => (item.secondaryMuscleGroups ?? []).includes(selectedMuscleGroup ?? ''))
+        .sort(
+          (left, right) =>
+            right.volumeKg - left.volumeKg || left.exerciseName.localeCompare(right.exerciseName),
+        ) ?? [],
     [overview, selectedMuscleGroup],
   );
   const exerciseOptions = overview?.current.exercises ?? [];
@@ -401,14 +437,38 @@ export function App() {
                       {selectedMuscleGroup ? `${selectedMuscleGroup} exercises` : 'Muscle details'}
                     </Heading>
                     {selectedMuscleGroup ? (
-                      selectedMuscleExercises.length ? (
-                        <Stack gap="1" mb="6">
-                          {selectedMuscleExercises.map((item) => (
-                            <Text key={item.exerciseKey} fontSize="sm">
-                              {item.exerciseName}: {formatNumber(item.volumeKg)} kg ·{' '}
-                              {item.setCount} sets
-                            </Text>
-                          ))}
+                      directMuscleExercises.length || indirectMuscleExercises.length ? (
+                        <Stack gap="4" mb="6">
+                          {directMuscleExercises.length > 0 && (
+                            <Box>
+                              <Heading size="xs" mb="2">
+                                Direct work
+                              </Heading>
+                              <Stack gap="1">
+                                {directMuscleExercises.map((item) => (
+                                  <Text key={item.exerciseKey} fontSize="sm">
+                                    {item.exerciseName}: {formatNumber(item.volumeKg)} kg ·{' '}
+                                    {item.setCount} sets
+                                  </Text>
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
+                          {indirectMuscleExercises.length > 0 && (
+                            <Box borderTopWidth="1px" pt="3">
+                              <Heading size="xs" mb="2">
+                                Indirect work
+                              </Heading>
+                              <Stack gap="1">
+                                {indirectMuscleExercises.map((item) => (
+                                  <Text key={item.exerciseKey} fontSize="sm">
+                                    {item.exerciseName}: {formatNumber(item.volumeKg)} kg ·{' '}
+                                    {item.setCount} sets
+                                  </Text>
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
                         </Stack>
                       ) : (
                         <Text color="fg.muted" fontSize="sm" mb="6">
@@ -579,6 +639,188 @@ export function App() {
               Prepare weekly analysis
             </Button>
           </Card.Footer>
+        </Card.Root>
+        <Card.Root>
+          <Card.Header>
+            <Heading size="md">Weekly report</Heading>
+          </Card.Header>
+          <Card.Body>
+            {weeklyReportQuery.isPending ? (
+              <Text color="fg.muted">Loading the latest weekly report…</Text>
+            ) : weeklyReportQuery.isError ? (
+              <Text color="red.fg">Unable to load the latest weekly report.</Text>
+            ) : weeklyReport ? (
+              <Stack gap="4">
+                <Text color="fg.muted" fontSize="sm">
+                  {weeklyReport.weekStart} to {weeklyReport.weekEnd} · generated{' '}
+                  {new Date(weeklyReport.generatedAt).toLocaleString()}
+                </Text>
+                <SimpleGrid columns={{ base: 2, md: 4 }} gap="3">
+                  {[
+                    [
+                      'Workouts',
+                      weeklyReport.totals.workoutCount,
+                      weeklyReport.changes.workoutCount,
+                      '',
+                    ],
+                    ['Sets', weeklyReport.totals.setCount, weeklyReport.changes.setCount, ''],
+                    ['Reps', weeklyReport.totals.repCount, weeklyReport.changes.repCount, ''],
+                    ['Volume', weeklyReport.totals.volumeKg, weeklyReport.changes.volumeKg, ' kg'],
+                  ].map(([label, value, change, unit]) => (
+                    <Card.Root key={String(label)} size="sm" variant="outline">
+                      <Card.Body>
+                        <Text color="fg.muted" fontSize="xs">
+                          {label}
+                        </Text>
+                        <Heading size="md">
+                          {formatNumber(Number(value))}
+                          {unit}
+                        </Heading>
+                        <Text color={Number(change) >= 0 ? 'green.fg' : 'red.fg'} fontSize="xs">
+                          {change === null
+                            ? 'No previous comparison'
+                            : `${Number(change) >= 0 ? '+' : ''}${formatNumber(Number(change))}${unit} vs previous week`}
+                        </Text>
+                      </Card.Body>
+                    </Card.Root>
+                  ))}
+                </SimpleGrid>
+                <SimpleGrid columns={{ base: 1, lg: 2 }} gap="6">
+                  <Box overflowX="auto">
+                    <Heading size="sm" mb="2">
+                      Strength changes
+                    </Heading>
+                    {weeklyReport.strengthChanges.length ? (
+                      <Table.Root size="sm">
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.ColumnHeader>Exercise</Table.ColumnHeader>
+                            <Table.ColumnHeader>Current best</Table.ColumnHeader>
+                            <Table.ColumnHeader>Previous</Table.ColumnHeader>
+                            <Table.ColumnHeader>Change</Table.ColumnHeader>
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {weeklyReport.strengthChanges.map((change) => (
+                            <Table.Row key={change.exerciseKey}>
+                              <Table.Cell>{change.exerciseName}</Table.Cell>
+                              <Table.Cell>{formatNumber(change.currentMaxLoadKg)} kg</Table.Cell>
+                              <Table.Cell>
+                                {change.previousMaxLoadKg === null
+                                  ? '—'
+                                  : `${formatNumber(change.previousMaxLoadKg)} kg`}
+                              </Table.Cell>
+                              <Table.Cell
+                                color={
+                                  change.changeKg === null || change.changeKg >= 0
+                                    ? 'green.fg'
+                                    : 'red.fg'
+                                }
+                              >
+                                {change.changeKg === null
+                                  ? 'New'
+                                  : `${change.changeKg >= 0 ? '+' : ''}${formatNumber(change.changeKg)} kg`}
+                              </Table.Cell>
+                            </Table.Row>
+                          ))}
+                        </Table.Body>
+                      </Table.Root>
+                    ) : (
+                      <Text color="fg.muted" fontSize="sm">
+                        No weighted exercise PRs in this report period.
+                      </Text>
+                    )}
+                  </Box>
+                  <Box>
+                    <Heading size="sm" mb="2">
+                      Personal bests
+                    </Heading>
+                    {weeklyReport.prs.length ? (
+                      <Table.Root size="sm">
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.ColumnHeader>Exercise</Table.ColumnHeader>
+                            <Table.ColumnHeader>Best load</Table.ColumnHeader>
+                            <Table.ColumnHeader>Achieved</Table.ColumnHeader>
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {weeklyReport.prs.map((pr) => (
+                            <Table.Row key={pr.exerciseKey}>
+                              <Table.Cell>{pr.exerciseName}</Table.Cell>
+                              <Table.Cell>{formatNumber(pr.maxLoadKg)} kg</Table.Cell>
+                              <Table.Cell>{pr.achievedOn.join(', ')}</Table.Cell>
+                            </Table.Row>
+                          ))}
+                        </Table.Body>
+                      </Table.Root>
+                    ) : (
+                      <Text color="fg.muted" fontSize="sm">
+                        No weighted exercise PRs in this report period.
+                      </Text>
+                    )}
+                  </Box>
+                </SimpleGrid>
+                <Box>
+                  <Heading size="sm" mb="1">
+                    Muscle-group volume
+                  </Heading>
+                  <Stack direction="row" gap="4" mb="3">
+                    <Text color="fg.muted" fontSize="xs">
+                      <Box as="span" bg="blue.500" display="inline-block" h="2" mr="1" w="2" />{' '}
+                      Current week
+                    </Text>
+                    <Text color="fg.muted" fontSize="xs">
+                      <Box as="span" bg="gray.400" display="inline-block" h="2" mr="1" w="2" />{' '}
+                      Previous week
+                    </Text>
+                  </Stack>
+                  {weeklyReport.muscleGroupVolumeDeltas.length ? (
+                    <Stack gap="3">
+                      {weeklyReport.muscleGroupVolumeDeltas.map((change) => (
+                        <Box key={change.muscleGroup}>
+                          <Stack direction="row" justify="space-between" mb="1">
+                            <Text fontSize="sm">{change.muscleGroup.replace('_', ' ')}</Text>
+                            <Text
+                              color={change.changeKg >= 0 ? 'green.fg' : 'red.fg'}
+                              fontSize="sm"
+                            >
+                              {change.changeKg >= 0 ? '+' : ''}
+                              {formatNumber(change.changeKg)} kg
+                            </Text>
+                          </Stack>
+                          <Stack gap="1">
+                            <Box bg="gray.200" borderRadius="full" h="2" overflow="hidden">
+                              <Box
+                                aria-label={`${change.muscleGroup} current week: ${formatNumber(change.currentVolumeKg)} kg`}
+                                bg="blue.500"
+                                h="full"
+                                w={`${(change.currentVolumeKg / maximumWeeklyMuscleVolume) * 100}%`}
+                              />
+                            </Box>
+                            <Box bg="gray.200" borderRadius="full" h="2" overflow="hidden">
+                              <Box
+                                aria-label={`${change.muscleGroup} previous week: ${formatNumber(change.previousVolumeKg)} kg`}
+                                bg="gray.400"
+                                h="full"
+                                w={`${(change.previousVolumeKg / maximumWeeklyMuscleVolume) * 100}%`}
+                              />
+                            </Box>
+                          </Stack>
+                        </Box>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Text color="fg.muted" fontSize="sm">
+                      No muscle-group volume in this report period.
+                    </Text>
+                  )}
+                </Box>
+              </Stack>
+            ) : (
+              <Text color="fg.muted">No weekly report has been generated yet.</Text>
+            )}
+          </Card.Body>
         </Card.Root>
         <Card.Root>
           <Card.Header>
@@ -771,16 +1013,27 @@ export function App() {
             <Dialog.Body>
               <Stack gap="3">
                 <Text>
-                  Selected local range: {from} to {to}.
+                  Generate a rolling local report for {dateBefore(to, 6)} to {to}.
                 </Text>
                 <Text color="fg.muted">
-                  This confirmation does not call ChatGPT or any model. MCP analysis is added in
-                  Task 10 and will remain an explicit user action.
+                  This writes only the local weekly report. It does not call ChatGPT or any model.
                 </Text>
+                {generateWeeklyReport.isError && (
+                  <Text color="red.fg">Unable to generate the weekly report.</Text>
+                )}
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button onClick={() => setAnalysisDialogOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setAnalysisDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="blue"
+                loading={generateWeeklyReport.isPending}
+                onClick={() => generateWeeklyReport.mutate()}
+              >
+                Generate weekly report
+              </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger />
           </Dialog.Content>

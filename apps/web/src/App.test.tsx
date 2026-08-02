@@ -49,6 +49,7 @@ const overview = {
         exerciseKey: 'row',
         exerciseName: 'Cable Row',
         muscleGroup: 'back',
+        secondaryMuscleGroups: ['chest'],
         setCount: 3,
         volumeKg: 300,
         maxLoadKg: 50,
@@ -192,6 +193,58 @@ describe('App', () => {
     });
   });
 
+  it('generates a weekly report only after confirmation and displays the persisted facts', async () => {
+    const report = {
+      weekStart: '2026-07-20',
+      weekEnd: '2026-07-26',
+      generatedAt: '2026-07-27T10:00:00.000Z',
+      totals: { workoutCount: 2, setCount: 6, repCount: 48, volumeKg: 1200, averageRpe: 8 },
+      changes: { workoutCount: 1, setCount: 2, repCount: 12, volumeKg: 400 },
+      prs: [],
+      strengthChanges: [
+        {
+          exerciseKey: 'bench',
+          exerciseName: 'Bench Press',
+          currentMaxLoadKg: 80,
+          previousMaxLoadKg: 75,
+          changeKg: 5,
+        },
+      ],
+      muscleGroupVolumeDeltas: [
+        { muscleGroup: 'chest', currentVolumeKg: 900, previousVolumeKg: 500, changeKg: 400 },
+      ],
+    };
+    let generated = false;
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/health/status')) return response({ status: 'ok', database: 'connected' });
+      if (url.includes('/dashboard/weekly-report')) {
+        if (init?.method === 'POST') generated = true;
+        return response(generated ? report : null);
+      }
+      return response([]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderApp();
+
+    expect(await screen.findByText('No weekly report has been generated yet.')).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          String(url).includes('/dashboard/weekly-report') && init?.method === 'POST',
+      ),
+    ).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Prepare weekly analysis' }));
+    expect(screen.getByText(/Generate a rolling local report/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Generate weekly report' }));
+
+    expect(await screen.findByRole('columnheader', { name: 'Current best' })).toBeInTheDocument();
+    expect(screen.getByText('Bench Press')).toBeInTheDocument();
+    expect(screen.getByText('+5 kg')).toBeInTheDocument();
+    expect(screen.getByLabelText('chest current week: 900 kg')).toBeInTheDocument();
+  });
+
   it('supports range presets, ranked muscle details, autocomplete, and imported measurements', async () => {
     vi.stubGlobal(
       'fetch',
@@ -212,6 +265,7 @@ describe('App', () => {
           ]);
         if (url.includes('/dashboard/exercise-trend'))
           return response({ trend: [overview.current.exercises[0]] });
+        if (url.includes('/dashboard/weekly-report')) return response(null);
         if (url.endsWith('/hevy/status'))
           return response({ id: 'hevy', status: 'never', lastSyncedAt: null, message: null });
         return response([]);
@@ -226,6 +280,9 @@ describe('App', () => {
     expect(screen.getByLabelText('From')).toHaveValue(`${new Date().toISOString().slice(0, 8)}01`);
     await user.click(screen.getByRole('button', { name: /chest/i }));
     expect(await screen.findByText(/Bench Press: 900 kg/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Direct work' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Indirect work' })).toBeInTheDocument();
+    expect(screen.getByText(/Cable Row: 300 kg/)).toBeInTheDocument();
     await user.type(screen.getByRole('combobox', { name: 'Exercise filter' }), 'Bench Press');
     expect(await screen.findByText('High-load PR dates: 2026-07-26')).toBeInTheDocument();
   });

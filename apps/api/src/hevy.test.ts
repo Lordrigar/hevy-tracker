@@ -171,3 +171,27 @@ describe('HevySyncService incremental reconciliation', () => {
     expect(deleteMany).toHaveBeenLastCalledWith({ where: { id: 'workout_fixture_deleted' } });
   });
 });
+
+describe('HevySyncService report boundary', () => {
+  it('never generates or replaces a weekly report when a sync succeeds', async () => {
+    const weeklyReportUpsert = vi.fn();
+    const service = new HevySyncService(
+      {
+        syncState: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+        syncLog: { create: vi.fn().mockResolvedValue({ id: 'sync' }), update: vi.fn() },
+        weeklyReport: { upsert: weeklyReportUpsert },
+      } as never,
+      {} as never,
+    ) as unknown as { sync: () => Promise<unknown>; syncInitial: () => Promise<unknown> };
+    service.syncInitial = vi.fn().mockResolvedValue({
+      imported: 1,
+      updated: 0,
+      deleted: 0,
+      message: 'Imported 1 workout.',
+    });
+
+    await service.sync();
+
+    expect(weeklyReportUpsert).not.toHaveBeenCalled();
+  });
+});

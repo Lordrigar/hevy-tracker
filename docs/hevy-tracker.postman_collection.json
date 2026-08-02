@@ -358,6 +358,60 @@
               }
             }
           ]
+        },
+        {
+          "name": "Generate weekly report (manual trigger)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/weekly-report?weekStart=2026-07-20",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "weekly-report"],
+              "query": [{ "key": "weekStart", "value": "2026-07-20" }]
+            },
+            "description": "Explicitly computes and upserts the local report for 2026-07-20 through 2026-07-26. It does not sync Hevy or call ChatGPT. Repeating it refreshes only this local report."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns a generated weekly report', function () { pm.response.to.have.status(201); var body = pm.response.json(); pm.expect(body.weekStart).to.eql('2026-07-20'); pm.expect(body.weekEnd).to.eql('2026-07-26'); pm.expect(body).to.have.property('strengthChanges'); });",
+                  "pm.test('does not return a secret', function () { pm.expect(JSON.stringify(pm.response.json())).to.not.include('HEVY_API_KEY'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get latest weekly report",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/weekly-report",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "weekly-report"]
+            },
+            "description": "Reads the latest persisted local weekly report. It never regenerates the report, syncs Hevy, or calls ChatGPT."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns a report or null before the first generation', function () { pm.response.to.have.status(200); var body = pm.response.json(); pm.expect(body === null || typeof body === 'object').to.eql(true); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

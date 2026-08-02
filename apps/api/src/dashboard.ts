@@ -3,8 +3,8 @@ import {
   compareTrainingPeriods,
   type AnalyticsWorkout,
 } from '@hevy/analytics';
-import { BadRequestException, Controller, Get, Injectable, Query } from '@nestjs/common';
-import { IsDateString, IsNotEmpty, IsString } from 'class-validator';
+import { BadRequestException, Controller, Get, Injectable, Post, Query } from '@nestjs/common';
+import { IsDateString, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from './prisma.service';
 
 export class AnalyticsPeriodQuery {
@@ -20,6 +20,50 @@ export class ExerciseTrendQuery extends AnalyticsPeriodQuery {
   @IsNotEmpty()
   exercise!: string;
 }
+
+export class WeeklyReportQuery {
+  @IsOptional()
+  @IsDateString()
+  weekStart?: string;
+}
+
+export type WeeklyReport = {
+  weekStart: string;
+  weekEnd: string;
+  generatedAt: string;
+  totals: {
+    workoutCount: number;
+    setCount: number;
+    repCount: number;
+    volumeKg: number;
+    averageRpe: number | null;
+  };
+  changes: {
+    workoutCount: number | null;
+    setCount: number | null;
+    repCount: number | null;
+    volumeKg: number | null;
+  };
+  prs: Array<{
+    exerciseKey: string;
+    exerciseName: string;
+    maxLoadKg: number;
+    achievedOn: string[];
+  }>;
+  strengthChanges: Array<{
+    exerciseKey: string;
+    exerciseName: string;
+    currentMaxLoadKg: number;
+    previousMaxLoadKg: number | null;
+    changeKg: number | null;
+  }>;
+  muscleGroupVolumeDeltas: Array<{
+    muscleGroup: string;
+    currentVolumeKg: number;
+    previousVolumeKg: number;
+    changeKg: number;
+  }>;
+};
 
 export type WorkoutHistoryItem = {
   id: string;
@@ -113,6 +157,82 @@ export class DashboardAnalyticsService {
         bicepCm: true,
       },
     });
+  }
+
+  async weeklyReport(query: WeeklyReportQuery): Promise<WeeklyReport | null> {
+    const stored = query.weekStart
+      ? await this.prisma.weeklyReport.findUnique({
+          where: { weekStart: parseDate(query.weekStart, 'weekStart') },
+        })
+      : await this.prisma.weeklyReport.findFirst({ orderBy: { weekStart: 'desc' } });
+    return stored ? (stored.report as WeeklyReport) : null;
+  }
+
+  async generateWeeklyReport(query: WeeklyReportQuery): Promise<WeeklyReport> {
+    const weekStart = query.weekStart
+      ? parseDate(query.weekStart, 'weekStart')
+      : rollingWeekStart(new Date());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    const period = this.periodFrom({ from: dateOnly(weekStart), to: dateOnly(weekEnd) });
+    const [currentWorkouts, previousWorkouts] = await Promise.all([
+      this.workoutsIn(period.currentStart, period.currentEndExclusive),
+      this.workoutsIn(period.previousStart, period.currentStart),
+    ]);
+    const comparison = compareTrainingPeriods(currentWorkouts, previousWorkouts);
+    const previousExercises = new Map(
+      comparison.previous.exercises.map((exercise) => [exercise.exerciseKey, exercise]),
+    );
+    const report: WeeklyReport = {
+      weekStart: dateOnly(weekStart),
+      weekEnd: dateOnly(weekEnd),
+      generatedAt: new Date().toISOString(),
+      totals: {
+        workoutCount: comparison.current.totals.workoutCount,
+        setCount: comparison.current.totals.setCount,
+        repCount: comparison.current.totals.repCount,
+        volumeKg: comparison.current.totals.volumeKg,
+        averageRpe: comparison.current.totals.averageRpe,
+      },
+      changes: {
+        workoutCount: comparison.changes.workoutCount.change,
+        setCount: comparison.changes.setCount.change,
+        repCount: comparison.changes.repCount.change,
+        volumeKg: comparison.changes.volumeKg.change,
+      },
+      prs: comparison.current.exercises
+        .filter((exercise) => exercise.maxLoadKg !== null)
+        .map((exercise) => ({
+          exerciseKey: exercise.exerciseKey,
+          exerciseName: exercise.exerciseName,
+          maxLoadKg: exercise.maxLoadKg!,
+          achievedOn: exercise.highLoadPrDates,
+        })),
+      strengthChanges: comparison.current.exercises
+        .filter((exercise) => exercise.maxLoadKg !== null)
+        .map((exercise) => {
+          const previousMaxLoadKg = previousExercises.get(exercise.exerciseKey)?.maxLoadKg ?? null;
+          return {
+            exerciseKey: exercise.exerciseKey,
+            exerciseName: exercise.exerciseName,
+            currentMaxLoadKg: exercise.maxLoadKg!,
+            previousMaxLoadKg,
+            changeKg: previousMaxLoadKg === null ? null : exercise.maxLoadKg! - previousMaxLoadKg,
+          };
+        }),
+      muscleGroupVolumeDeltas: comparison.changes.muscleGroups.map((muscleGroup) => ({
+        muscleGroup: muscleGroup.muscleGroup,
+        currentVolumeKg: muscleGroup.volumeKg,
+        previousVolumeKg: muscleGroup.previousVolumeKg,
+        changeKg: muscleGroup.volumeChangeKg,
+      })),
+    };
+    await this.prisma.weeklyReport.upsert({
+      where: { weekStart },
+      create: { weekStart, report },
+      update: { report },
+    });
+    return report;
   }
 
   private async workoutsIn(start: Date, endExclusive: Date): Promise<AnalyticsWorkout[]> {
@@ -211,6 +331,16 @@ export class DashboardAnalyticsController {
   measurementHistory(@Query() query: AnalyticsPeriodQuery) {
     return this.analytics.measurementHistory(query);
   }
+
+  @Get('weekly-report')
+  weeklyReport(@Query() query: WeeklyReportQuery) {
+    return this.analytics.weeklyReport(query);
+  }
+
+  @Post('weekly-report')
+  generateWeeklyReport(@Query() query: WeeklyReportQuery) {
+    return this.analytics.generateWeeklyReport(query);
+  }
 }
 
 function parseDate(value: string, name: string) {
@@ -226,4 +356,10 @@ function parseDate(value: string, name: string) {
 
 function dateOnly(value: Date) {
   return value.toISOString().slice(0, 10);
+}
+
+function rollingWeekStart(now: Date) {
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  end.setUTCDate(end.getUTCDate() - 6);
+  return end;
 }

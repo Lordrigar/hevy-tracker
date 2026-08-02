@@ -108,6 +108,41 @@ export type BodyMeasurement = {
   bicepCm: number | null;
 };
 
+export type WeeklyReport = {
+  weekStart: string;
+  weekEnd: string;
+  generatedAt: string;
+  totals: Pick<
+    TrainingTotals,
+    'workoutCount' | 'setCount' | 'repCount' | 'volumeKg' | 'averageRpe'
+  >;
+  changes: {
+    workoutCount: number | null;
+    setCount: number | null;
+    repCount: number | null;
+    volumeKg: number | null;
+  };
+  prs: Array<{
+    exerciseKey: string;
+    exerciseName: string;
+    maxLoadKg: number;
+    achievedOn: string[];
+  }>;
+  strengthChanges: Array<{
+    exerciseKey: string;
+    exerciseName: string;
+    currentMaxLoadKg: number;
+    previousMaxLoadKg: number | null;
+    changeKg: number | null;
+  }>;
+  muscleGroupVolumeDeltas: Array<{
+    muscleGroup: string;
+    currentVolumeKg: number;
+    previousVolumeKg: number;
+    changeKg: number;
+  }>;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -142,4 +177,7 @@ export const api = {
     request<{ trend: ExerciseAnalytics[] }>(
       `/dashboard/exercise-trend?from=${from}&to=${to}&exercise=${encodeURIComponent(exercise)}`,
     ),
+  weeklyReport: () => request<WeeklyReport | null>('/dashboard/weekly-report'),
+  generateWeeklyReport: (weekStart: string) =>
+    request<WeeklyReport>(`/dashboard/weekly-report?weekStart=${weekStart}`, { method: 'POST' }),
 };

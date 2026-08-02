@@ -119,4 +119,75 @@ describe('DashboardAnalyticsService', () => {
       },
     });
   });
+
+  it('upserts a seven-day report with boundary-safe comparisons and deterministic deltas', async () => {
+    const currentStart = new Date('2026-07-20T00:00:00.000Z');
+    const workoutFindMany = vi.fn(({ where }) =>
+      Promise.resolve(
+        where.startedAt.gte.getTime() === currentStart.getTime()
+          ? [
+              {
+                id: 'current-bench',
+                title: 'Current bench',
+                startedAt: new Date('2026-07-26T18:00:00.000Z'),
+                exercises: [
+                  {
+                    id: 'current-bench-exercise',
+                    templateId: 'bench',
+                    name: 'Bench Press',
+                    muscleGroup: 'chest',
+                    sets: [{ weightKg: 80, reps: 5, rpe: 8, ordinal: 0, isWarmup: false }],
+                  },
+                ],
+              },
+            ]
+          : [
+              {
+                id: 'previous-bench',
+                title: 'Previous bench',
+                startedAt: new Date('2026-07-13T18:00:00.000Z'),
+                exercises: [
+                  {
+                    id: 'previous-bench-exercise',
+                    templateId: 'bench',
+                    name: 'Bench Press',
+                    muscleGroup: 'chest',
+                    sets: [{ weightKg: 70, reps: 5, rpe: 8, ordinal: 0, isWarmup: false }],
+                  },
+                ],
+              },
+            ],
+      ),
+    );
+    const upsert = vi.fn().mockResolvedValue({});
+    const service = new DashboardAnalyticsService({
+      workout: { findMany: workoutFindMany },
+      hevyExerciseTemplate: { findMany: vi.fn().mockResolvedValue([]) },
+      hevyBodyMeasurement: { findMany: vi.fn().mockResolvedValue([]) },
+      weeklyReport: { upsert },
+    } as never);
+
+    const report = await service.generateWeeklyReport({ weekStart: '2026-07-20' });
+
+    expect(report).toMatchObject({
+      weekStart: '2026-07-20',
+      weekEnd: '2026-07-26',
+      totals: { workoutCount: 1, setCount: 1, repCount: 5, volumeKg: 400 },
+      changes: { workoutCount: 0, setCount: 0, repCount: 0, volumeKg: 50 },
+      prs: [{ exerciseKey: 'bench', maxLoadKg: 80, achievedOn: ['2026-07-26'] }],
+      strengthChanges: [
+        { exerciseKey: 'bench', currentMaxLoadKg: 80, previousMaxLoadKg: 70, changeKg: 10 },
+      ],
+      muscleGroupVolumeDeltas: [
+        { muscleGroup: 'chest', currentVolumeKg: 400, previousVolumeKg: 350, changeKg: 50 },
+      ],
+    });
+    expect(upsert).toHaveBeenCalledWith({
+      where: { weekStart: new Date('2026-07-20T00:00:00.000Z') },
+      create: expect.objectContaining({ weekStart: new Date('2026-07-20T00:00:00.000Z') }),
+      update: expect.objectContaining({
+        report: expect.objectContaining({ weekEnd: '2026-07-26' }),
+      }),
+    });
+  });
 });
